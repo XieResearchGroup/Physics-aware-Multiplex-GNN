@@ -3,8 +3,7 @@
 
 Implementatin of Physics-aware Multiplex Graph Neural Network in our [preprint](https://arxiv.org/abs/2206.02789) (*Efficient and Accurate Physics-aware Multiplex Graph Neural Networks for 3D Small Molecules and Macromolecule Complexes*) and [paper](https://arxiv.org/abs/2210.16392) (*Physics-aware Graph Neural Network for Accurate RNA 3D Structure Prediction*) on ([Machine Learning for Structural Biology Workshop](https://www.mlsb.io/)) at NeurIPS 2022.
 
-
-
+If you have any question, feel free to open an issue or reach out to: szhang4@gradcenter.cuny.edu.
 
 ## Overall Architecture
 
