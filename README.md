@@ -30,7 +30,8 @@ pip install -r requirements.txt
 ### Datasets
 
 **QM9**
- - The training script (`main_qm9.py`) will automatically download the QM9 dataset and preprocess it.
+
+The training script (`main_qm9.py`) will automatically download the QM9 dataset and preprocess it.
 
 **PDBbind**
  1. Download `PDBbind_dataset.tar.gz` from [dropbox](https://www.dropbox.com/sh/2uih3c6fq37qfli/AAD-LHXSWMLAuGWzcQLk5WI3a)
