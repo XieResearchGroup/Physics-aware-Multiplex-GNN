@@ -9,7 +9,7 @@ Implementatin of Physics-aware Multiplex Graph Neural Network in our [preprint](
 ## Overall Architecture
 
 <p align="center">
-<img src="https://github.com/zetayue/Physics-aware-Multiplex-GNN/blob/master/overview.png?raw=true">
+<img src="https://github.com/zetayue/Physics-aware-Multiplex-GNN/blob/main/overview.png?raw=true">
 </p>
 
 ## Setup
