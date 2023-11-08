@@ -1,9 +1,15 @@
 
-# Physics-aware Multiplex GNN for Accurate and Efficient Geometric Deep Learning of Molecular Systems
+# PAMNet: A Universal Framework for Accurate and Efficient Geometric Deep Learning of Molecular Systems
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-universal-framework-for-accurate-and/drug-discovery-on-qm9)](https://paperswithcode.com/sota/drug-discovery-on-qm9?p=a-universal-framework-for-accurate-and)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-universal-framework-for-accurate-and/protein-ligand-affinity-prediction-on-pdbbind)](https://paperswithcode.com/sota/protein-ligand-affinity-prediction-on-pdbbind?p=a-universal-framework-for-accurate-and)
 
-Implementatin of Physics-aware Multiplex Graph Neural Network in our [preprint](https://arxiv.org/abs/2206.02789) (*Efficient and Accurate Physics-aware Multiplex Graph Neural Networks for 3D Small Molecules and Macromolecule Complexes*) and [paper](https://arxiv.org/abs/2210.16392) (*Physics-aware Graph Neural Network for Accurate RNA 3D Structure Prediction*) on ([Machine Learning for Structural Biology Workshop](https://www.mlsb.io/)) at NeurIPS 2022.
+Official implementation of **PAMNet** (Physics-aware Multiplex Graph Neural Network) in our [paper](https://www.nature.com/articles/s41598-023-46382-8) "A universal framework for accurate and efficient geometric deep learning of molecular systems" accepted by *Scientific Reports* (doi: 10.1038/s41598-023-46382-8).
 
-If you have any question, feel free to open an issue or reach out to: szhang4@gradcenter.cuny.edu.
+This implementation is also applicable to:
+1. Our [preprint](https://arxiv.org/abs/2206.02789) "Efficient and Accurate Physics-aware Multiplex Graph Neural Networks for 3D Small Molecules and Macromolecule Complexes".
+2. Our [paper](https://arxiv.org/abs/2210.16392) "Physics-aware Graph Neural Network for Accurate RNA 3D Structure Prediction" on [Machine Learning for Structural Biology Workshop](https://www.mlsb.io/) at *NeurIPS 2022*.
+
+If you have any questions, feel free to open an issue or reach out to: szhang4@gradcenter.cuny.edu.
 
 ## Overall Architecture
 
@@ -17,7 +23,7 @@ If you have any question, feel free to open an issue or reach out to: szhang4@gr
  - Python : 3.7.4 
  - CUDA : 10.1
 
-Optional: Install Open Babel 3.1.1 for experiment on PDBbind:
+Optional: Install Open Babel 3.1.1 for the experiment on PDBbind:
 
  1. Download [source file](https://anaconda.org/conda-forge/openbabel/3.1.1/download/linux-64/openbabel-3.1.1-py37h200e996_1.tar.bz2)
  2. `conda install filename`
@@ -73,13 +79,17 @@ The training script (`main_qm9.py`) will automatically download the QM9 dataset 
     python -u main_rna_puzzles.py --dataset 'RNA-Puzzles' --epochs=15 --batch_size=8  --dim=16 --n_layer=1 --lr=1e-4
 
 ## Citation
-If you find our model and code are helpful in your work, please consider citing our paper:
+If you find our model and code helpful in your work, please consider citing us:
 ```
-@article{zhang2022efficient,
-  title={Efficient and Accurate Physics-aware Multiplex Graph Neural Networks for 3D Small Molecules and Macromolecule Complexes},
+@article{zhang2023universal,
+  title={A Universal Framework for Accurate and Efficient Geometric Deep Learning of Molecular Systems},
   author={Zhang, Shuo and Liu, Yang and Xie, Lei},
-  journal={arXiv preprint arXiv:2206.02789},
-  year={2022}
+  journal={Scientific Reports},
+  volume={13},
+  number={1},
+  pages={19171},
+  year={2023},
+  publisher={Nature Publishing Group UK London}
 }
 
 @article{zhang2022physics,
