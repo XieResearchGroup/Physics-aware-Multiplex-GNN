@@ -7,8 +7,8 @@ Official implementation of **PAMNet** (Physics-aware Multiplex Graph Neural Netw
 <br/><br/>
 
 This implementation is also applicable to:
-1. Our preprint **[Efficient and Accurate Physics-aware Multiplex Graph Neural Networks for 3D Small Molecules and Macromolecule Complexes](https://arxiv.org/abs/2206.02789)**.
-2. Our paper **[Physics-aware Graph Neural Network for Accurate RNA 3D Structure Prediction](https://arxiv.org/abs/2210.16392)** on [Machine Learning for Structural Biology Workshop](https://www.mlsb.io/) at *NeurIPS 2022*.
+1. Our preprint [Efficient and Accurate Physics-aware Multiplex Graph Neural Networks for 3D Small Molecules and Macromolecule Complexes](https://arxiv.org/abs/2206.02789).
+2. Our paper [Physics-aware Graph Neural Network for Accurate RNA 3D Structure Prediction](https://arxiv.org/abs/2210.16392) on [Machine Learning for Structural Biology Workshop](https://www.mlsb.io/) at *NeurIPS 2022*.
 
 If you have any questions, feel free to open an issue or reach out to: szhang4@gradcenter.cuny.edu.
 
