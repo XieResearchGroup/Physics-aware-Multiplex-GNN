@@ -3,11 +3,12 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-universal-framework-for-accurate-and/drug-discovery-on-qm9)](https://paperswithcode.com/sota/drug-discovery-on-qm9?p=a-universal-framework-for-accurate-and)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-universal-framework-for-accurate-and/protein-ligand-affinity-prediction-on-pdbbind)](https://paperswithcode.com/sota/protein-ligand-affinity-prediction-on-pdbbind?p=a-universal-framework-for-accurate-and)
 
-Official implementation of **PAMNet** (Physics-aware Multiplex Graph Neural Network) in our [paper](https://www.nature.com/articles/s41598-023-46382-8) "A universal framework for accurate and efficient geometric deep learning of molecular systems" accepted by *Scientific Reports* (doi: 10.1038/s41598-023-46382-8).
+Official implementation of **PAMNet** (Physics-aware Multiplex Graph Neural Network) in our paper **[A universal framework for accurate and efficient geometric deep learning of molecular systems](https://www.nature.com/articles/s41598-023-46382-8)** accepted by *Scientific Reports* (doi: 10.1038/s41598-023-46382-8).
+<br/><br/>
 
 This implementation is also applicable to:
-1. Our [preprint](https://arxiv.org/abs/2206.02789) "Efficient and Accurate Physics-aware Multiplex Graph Neural Networks for 3D Small Molecules and Macromolecule Complexes".
-2. Our [paper](https://arxiv.org/abs/2210.16392) "Physics-aware Graph Neural Network for Accurate RNA 3D Structure Prediction" on [Machine Learning for Structural Biology Workshop](https://www.mlsb.io/) at *NeurIPS 2022*.
+1. Our preprint **[Efficient and Accurate Physics-aware Multiplex Graph Neural Networks for 3D Small Molecules and Macromolecule Complexes](https://arxiv.org/abs/2206.02789)**.
+2. Our paper **[Physics-aware Graph Neural Network for Accurate RNA 3D Structure Prediction](https://arxiv.org/abs/2210.16392)** on [Machine Learning for Structural Biology Workshop](https://www.mlsb.io/) at *NeurIPS 2022*.
 
 If you have any questions, feel free to open an issue or reach out to: szhang4@gradcenter.cuny.edu.
 
