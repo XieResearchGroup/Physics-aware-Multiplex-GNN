@@ -5,7 +5,7 @@
 
 Official implementation of **PAMNet** (Physics-aware Multiplex Graph Neural Network) in our paper **[A universal framework for accurate and efficient geometric deep learning of molecular systems](https://www.nature.com/articles/s41598-023-46382-8)** accepted by *Nature Scientific Reports* (doi: 10.1038/s41598-023-46382-8).
 
-PAMNet is an improved version of [MXMNet](https://github.com/zetayue/MXMNet) with higher accuracy and efficiency through comprehensive evaluations on **small molecule property prediction**, **RNA 3D structure prediction**, and **protein-ligand binding affinity prediction**.
+PAMNet is an improved version of [MXMNet](https://github.com/zetayue/MXMNet) and outperforms state-of-the-art baselines regarding both accuracy and efficiency in diverse tasks including **small molecule property prediction**, **RNA 3D structure prediction**, and **protein-ligand binding affinity prediction**.
 <br/><br/>
 
 This implementation is also applicable to:
