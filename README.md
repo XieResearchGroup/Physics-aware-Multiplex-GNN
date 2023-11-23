@@ -1,7 +1,7 @@
 
 # PAMNet: A Universal Framework for Accurate and Efficient Geometric Deep Learning of Molecular Systems
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-universal-framework-for-accurate-and/drug-discovery-on-qm9)](https://paperswithcode.com/sota/drug-discovery-on-qm9?p=a-universal-framework-for-accurate-and)
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-universal-framework-for-accurate-and/protein-ligand-affinity-prediction-on-pdbbind)](https://paperswithcode.com/sota/protein-ligand-affinity-prediction-on-pdbbind?p=a-universal-framework-for-accurate-and)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-universal-framework-for-accurate-and-1/drug-discovery-on-qm9)](https://paperswithcode.com/sota/drug-discovery-on-qm9?p=a-universal-framework-for-accurate-and-1)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-universal-framework-for-accurate-and-1/protein-ligand-affinity-prediction-on-pdbbind)](https://paperswithcode.com/sota/protein-ligand-affinity-prediction-on-pdbbind?p=a-universal-framework-for-accurate-and-1)
 
 Official implementation of **PAMNet** (Physics-aware Multiplex Graph Neural Network) in our paper **[A universal framework for accurate and efficient geometric deep learning of molecular systems](https://www.nature.com/articles/s41598-023-46382-8)** accepted by *Nature Scientific Reports* (doi: 10.1038/s41598-023-46382-8).
 
