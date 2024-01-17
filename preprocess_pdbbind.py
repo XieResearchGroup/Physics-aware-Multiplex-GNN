@@ -8,7 +8,7 @@ import torch
 from torch_geometric.nn import radius
 from torch_geometric.utils import remove_self_loops
 
-from utils import Featurizer
+from utils.featurizer import Featurizer
 
 
 def find_interacting_atoms(decoy, target, cutoff=6.0):
