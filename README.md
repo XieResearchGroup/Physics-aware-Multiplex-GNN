@@ -3,14 +3,14 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-universal-framework-for-accurate-and-1/drug-discovery-on-qm9)](https://paperswithcode.com/sota/drug-discovery-on-qm9?p=a-universal-framework-for-accurate-and-1)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-universal-framework-for-accurate-and-1/protein-ligand-affinity-prediction-on-pdbbind)](https://paperswithcode.com/sota/protein-ligand-affinity-prediction-on-pdbbind?p=a-universal-framework-for-accurate-and-1)
 
-Official implementation of **PAMNet** (Physics-aware Multiplex Graph Neural Network) in our paper **[A universal framework for accurate and efficient geometric deep learning of molecular systems](https://www.nature.com/articles/s41598-023-46382-8)** accepted by *Nature Scientific Reports* (doi: 10.1038/s41598-023-46382-8).
+Official implementation of **PAMNet** (Physics-aware Multiplex Graph Neural Network) in our paper **[A universal framework for accurate and efficient geometric deep learning of molecular systems](https://www.nature.com/articles/s41598-023-46382-8)** accepted by *Nature Scientific Reports*.
 
-PAMNet is an improved version of [MXMNet](https://github.com/zetayue/MXMNet) and outperforms state-of-the-art baselines regarding both accuracy and efficiency in diverse tasks including **small molecule property prediction**, **RNA 3D structure prediction**, and **protein-ligand binding affinity prediction**.
+PAMNet is an improved version of our [MXMNet](https://github.com/zetayue/MXMNet) and outperforms state-of-the-art baselines regarding both accuracy and efficiency in diverse tasks including **small molecule property prediction**, **RNA 3D structure prediction**, and **protein-ligand binding affinity prediction**.
 <br/><br/>
 
 This implementation is also applicable to:
-1. Our preprint [Efficient and Accurate Physics-aware Multiplex Graph Neural Networks for 3D Small Molecules and Macromolecule Complexes](https://arxiv.org/abs/2206.02789).
-2. Our paper [Physics-aware Graph Neural Network for Accurate RNA 3D Structure Prediction](https://arxiv.org/abs/2210.16392) on [Machine Learning for Structural Biology Workshop](https://www.mlsb.io/) at *NeurIPS 2022*.
+1. [Efficient and Accurate Physics-aware Multiplex Graph Neural Networks for 3D Small Molecules and Macromolecule Complexes](https://arxiv.org/abs/2206.02789) (preprint).
+2. [Physics-aware Graph Neural Network for Accurate RNA 3D Structure Prediction](https://arxiv.org/abs/2210.16392) ([Machine Learning for Structural Biology Workshop](https://www.mlsb.io/) at *NeurIPS 2022*).
 
 If you have any questions, feel free to open an issue or reach out to: szhang4@gradcenter.cuny.edu.
 
@@ -20,22 +20,38 @@ If you have any questions, feel free to open an issue or reach out to: szhang4@g
 <img src="https://github.com/zetayue/Physics-aware-Multiplex-GNN/blob/main/overview.png?raw=true">
 </p>
 
-## Setup
-### Environment
+## Updates
+- **`2024-01` We provide the docker image for running PAMNet at https://hub.docker.com/r/zetayue/pamnet.**
+- **`2023-10` PAMNet [paper](https://www.nature.com/articles/s41598-023-46382-8) was accepted by *Nature Scientific Reports*.**
+- **`2023-07` We release the code for PAMNet.**
+
+## Environment Setup
+### Option 1: Base on Dependencies
 
  - Python : 3.7.4 
  - CUDA : 10.1
+
+Dependencies can be installed with:
+```
+pip install -r requirements.txt
+```
 
 **Optional**: Install Open Babel 3.1.1 for binding affinity prediction on PDBbind:
 
  1. Download [source file](https://anaconda.org/conda-forge/openbabel/3.1.1/download/linux-64/openbabel-3.1.1-py37h200e996_1.tar.bz2)
  2. `conda install filename`
 
-The other dependencies can be installed with:
+### Option 2: Docker Image
+Docker image for running PAMNet is available at https://hub.docker.com/r/zetayue/pamnet.
+
+Requires **[NVIDIA Container Toolkit](https://github.com/NVIDIA/nvidia-container-toolkit)** installed to run with GPU support.
+
+Example command to run:
 ```
-pip install -r requirements.txt
+nvidia-docker run --name pamnet -it --network=host --shm-size=1g --rm -v LOCAL_PATH:MOUNTED_PATH zetayue/pamnet:latest
 ```
-### Datasets
+
+## Datasets
 
 **QM9 for small molecule property prediction:**
 
