@@ -1,0 +1,33 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Train Puzzles",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main_rna_puzzles.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--dataset",
+                "RNA-Puzzles",
+                "--epochs=15",
+                "--batch_size=1",
+                "--dim=16",
+                "--n_layer=1",
+                "--lr=1e-4"
+            ]
+        },
+        {
+            "name": "Preprocess PDBs",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "preprocess_rna_pdb.py",
+            "console": "integratedTerminal",
+            "args": [
+            ]
+        }
+    ]
+}
