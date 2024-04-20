@@ -1,0 +1,7 @@
+# directories
+artifacts/*
+data/*
+wandb/*
+
+# files
+*.pyc
