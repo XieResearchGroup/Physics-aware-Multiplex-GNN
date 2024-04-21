@@ -95,7 +95,7 @@ class PAMNet(nn.Module):
 
     def forward(self, data):
         x_raw = data.x
-        batch = data.batch
+        batch = data.batch # This parameter assigns an index to each node in the graph, indicating which graph it belongs to.
 
         if self.dataset == "QM9":
             edge_index_l = data.edge_index
@@ -136,7 +136,7 @@ class PAMNet(nn.Module):
             x = torch.index_select(self.embeddings, 0, x_raw[:, -1].long())
             pos = x_raw[:,:3].contiguous()
 
-            row, col = knn(pos, pos, 50, batch, batch)
+            row, col = knn(pos, pos, 50, batch, batch) # TODO: Do we need 50 clusters? Maybe less...?
             edge_index_knn = torch.stack([row, col], dim=0)
             edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
 

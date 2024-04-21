@@ -5,16 +5,16 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Train Puzzles",
+            "name": "Train PDBs",
             "type": "debugpy",
             "request": "launch",
-            "program": "main_rna_puzzles.py",
+            "program": "main_rna_pdb.py",
             "console": "integratedTerminal",
             "args": [
                 "--dataset",
-                "RNA-Puzzles",
+                "RNA-PDB",
                 "--epochs=15",
-                "--batch_size=1",
+                "--batch_size=4",
                 "--dim=16",
                 "--n_layer=1",
                 "--lr=1e-4"

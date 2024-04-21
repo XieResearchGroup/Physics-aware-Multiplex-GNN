@@ -10,12 +10,12 @@ import torch.optim as optim
 from torch_geometric.data import DataLoader
 
 from models import PAMNet, Config
-from datasets import TUDataset
+from datasets import RNAPDBDataset
 
 def set_seed(seed):
+    torch.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
@@ -64,13 +64,16 @@ def main():
 
     # Creat dataset
     path = osp.join('.', 'data', args.dataset)
-    train_dataset = TUDataset(path, name='train', use_node_attr=True).shuffle()
-    val_dataset = TUDataset(path, name='val', use_node_attr=True)
+    train_dataset = RNAPDBDataset(path, name='train-pkl').shuffle()
+    val_dataset = RNAPDBDataset(path, name='val-pkl')
 
     # Load dataset
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
     print("Data loaded!")
+    for data, name in train_loader:
+        print(data)
+        break
 
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g)
 
