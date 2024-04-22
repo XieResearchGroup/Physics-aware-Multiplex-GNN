@@ -19,7 +19,7 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     seed_everything(seed)
-    
+
 
 def test(model, loader, device):
     model.eval()
@@ -76,7 +76,7 @@ def main():
     for data, name in train_loader:
         print(data)
         break
-
+    
     sampler = Sampler(timesteps=args.timesteps)
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g)
 
@@ -93,9 +93,10 @@ def main():
             data = data.to(device)
             optimizer.zero_grad()
 
-            t = torch.randint(0, args.timesteps, (data.batch.shape[0],), device=device).long() # Generate random timesteps
+            t = torch.randint(0, args.timesteps, (args.batch_size,), device=device).long() # Generate random timesteps
+            graphs_t = t[data.batch]
 
-            loss = p_losses(model, data, t, sampler=sampler, loss_type="huber")
+            loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
 
             loss.backward()
             optimizer.step()
