@@ -6,7 +6,8 @@ import random
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from torch_geometric.data import DataLoader
+from torch_geometric.loader import DataLoader
+from torch_geometric import seed_everything
 
 from models import PAMNet, Config
 from datasets import RNAPDBDataset
@@ -17,7 +18,8 @@ def set_seed(seed):
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
-    torch.backends.cudnn.benchmark = False
+    seed_everything(seed)
+    
 
 def test(model, loader, device):
     model.eval()

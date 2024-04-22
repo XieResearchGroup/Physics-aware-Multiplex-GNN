@@ -44,15 +44,16 @@ class PAMNet(nn.Module):
 
         self.embeddings = nn.Embedding(4, self.dim)
         self.init_linear = MLP([3, self.dim])
+        self.l_attn = nn.MultiheadAttention(2*self.dim+self.time_dim, 1)
 
         self.rbf_g = BesselBasisLayer(16, self.cutoff_g, envelope_exponent)
         self.rbf_l = BesselBasisLayer(16, self.cutoff_l, envelope_exponent)
         self.sbf = SphericalBasisLayer(num_spherical, num_radial, self.cutoff_l, envelope_exponent)
 
-        self.mlp_rbf_g = MLP([16, self.dim+self.time_dim])
-        self.mlp_rbf_l = MLP([16, self.dim+self.time_dim])    
-        self.mlp_sbf1 = MLP([num_spherical * num_radial, self.dim+self.time_dim])
-        self.mlp_sbf2 = MLP([num_spherical * num_radial, self.dim+self.time_dim])
+        self.mlp_rbf_g = MLP([16, 2*self.dim+self.time_dim])
+        self.mlp_rbf_l = MLP([16, 2*self.dim+self.time_dim])    
+        self.mlp_sbf1 = MLP([num_spherical * num_radial, 2*self.dim+self.time_dim])
+        self.mlp_sbf2 = MLP([num_spherical * num_radial, 2*self.dim+self.time_dim])
 
         self.time_mlp = nn.Sequential(
             SinusoidalPositionEmbeddings(self.dim),
@@ -63,11 +64,11 @@ class PAMNet(nn.Module):
 
         self.global_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.global_layer.append(Global_MessagePassing(self.dim+self.time_dim))
+            self.global_layer.append(Global_MessagePassing(2*self.dim+self.time_dim))
 
         self.local_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.local_layer.append(Local_MessagePassing(self.dim+self.time_dim))
+            self.local_layer.append(Local_MessagePassing(2*self.dim+self.time_dim))
 
         self.out_linear = nn.Linear(6, 3, bias=False)
 
@@ -121,11 +122,11 @@ class PAMNet(nn.Module):
             time_emb = self.time_mlp(t)
             pos = x_raw[:,:3].contiguous()
             x_pos = self.init_linear(pos) # coordinates embeddings
-            x = x + x_pos
-            x = torch.cat([x, time_emb], dim=1)
+            x = torch.cat([x, x_pos, time_emb], dim=1)
+            # x = torch.cat([x, time_emb], dim=1)
             
 
-            row, col = knn(pos, pos, 6, batch, batch) # TODO: Do we need 50 clusters? Maybe less...?
+            row, col = knn(pos, pos, 20, batch, batch) # TODO: Do we need 50 clusters? Maybe less...?
             edge_index_knn = torch.stack([row, col], dim=0)
             edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
 
@@ -185,6 +186,7 @@ class PAMNet(nn.Module):
 
             x, out_l, att_score_l = self.local_layer[layer](x, edge_attr_rbf_l, edge_attr_sbf2, edge_attr_sbf1, \
                                                     idx_kj, idx_ji, idx_jj_pair, idx_ji_pair, edge_index_l)
+            x, _ = self.l_attn(x, x, x)
             out_local.append(out_l)
             att_score_local.append(att_score_l)
         
