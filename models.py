@@ -32,7 +32,7 @@ class SinusoidalPositionEmbeddings(nn.Module):
         return embeddings
 
 class PAMNet(nn.Module):
-    def __init__(self, config: Config, num_spherical=7, num_radial=6, envelope_exponent=5, time_dim=8):
+    def __init__(self, config: Config, num_spherical=7, num_radial=6, envelope_exponent=5, time_dim=16):
         super(PAMNet, self).__init__()
 
         self.dataset = config.dataset
@@ -42,8 +42,8 @@ class PAMNet(nn.Module):
         self.cutoff_l = config.cutoff_l
         self.cutoff_g = config.cutoff_g
 
-        self.embeddings = nn.Parameter(torch.ones((5, self.dim)))
-        self.init_linear = nn.Linear(18, self.dim, bias=False)
+        self.embeddings = nn.Embedding(4, self.dim)
+        self.init_linear = MLP([3, self.dim])
 
         self.rbf_g = BesselBasisLayer(16, self.cutoff_g, envelope_exponent)
         self.rbf_l = BesselBasisLayer(16, self.cutoff_l, envelope_exponent)
@@ -69,15 +69,9 @@ class PAMNet(nn.Module):
         for _ in range(config.n_layer):
             self.local_layer.append(Local_MessagePassing(self.dim+self.time_dim))
 
-        self.mlp_out = nn.Linear(6, 3)
+        self.out_linear = nn.Linear(6, 3, bias=False)
 
         self.softmax = nn.Softmax(dim=-1)
-
-        self.init()
-
-    def init(self):
-        stdv = math.sqrt(3)
-        self.embeddings.data.uniform_(-stdv, stdv)
 
     def get_edge_info(self, edge_index, pos):
         edge_index, _ = remove_self_loops(edge_index)
@@ -121,68 +115,17 @@ class PAMNet(nn.Module):
         x_raw = data.x
         batch = data.batch # This parameter assigns an index to each node in the graph, indicating which graph it belongs to.
 
-        if self.dataset == "QM9":
-            edge_index_l = data.edge_index
-            pos = data.pos
-            x = torch.index_select(self.embeddings, 0, x_raw.long())
-
-            # Compute pairwise distances in global layer
-            row, col = radius(pos, pos, self.cutoff_g, batch, batch, max_num_neighbors=1000)
-            edge_index_g = torch.stack([row, col], dim=0)
-            edge_index_g, dist_g = self.get_edge_info(edge_index_g, pos)
-
-            # Compute pairwise distances in local layer
-            edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
-
-        elif self.dataset == "PDBbind":
+        if self.dataset == "RNA-PDB":
             x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
-            x = self.init_linear(x_raw[:, 3:])
-            pos = x_raw[:,:3].contiguous()
-
-            # Indices for computing energy difference
-            pos_index = torch.ones_like(pos[:, 0])
-            neg_index = torch.ones_like(pos[:, 0]) * (-1.0)
-            all_index = torch.where(pos[:, 0] > 40.0, neg_index, pos_index)
-
-            # Compute pairwise distances in global layer
-            row, col = radius(pos, pos, self.cutoff_g, batch, batch, max_num_neighbors=1000)
-            edge_index_g = torch.stack([row, col], dim=0)
-            edge_index_g, dist_g = self.get_edge_info(edge_index_g, pos)
-            
-            # Compute pairwise distances in local layer
-            tensor_l = torch.ones_like(dist_g, device=dist_g.device) * self.cutoff_l
-            mask_l = dist_g <= tensor_l
-            edge_index_l = edge_index_g[:, mask_l]
-            edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
-
-        elif self.dataset == "RNA-Puzzles":
-            x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
-            x = torch.index_select(self.embeddings, 0, x_raw[:, -1].long())
-            pos = x_raw[:,:3].contiguous()
-
-            row, col = knn(pos, pos, 50, batch, batch) # TODO: Do we need 50 clusters? Maybe less...?
-            edge_index_knn = torch.stack([row, col], dim=0)
-            edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
-
-            # Compute pairwise distances in global layer
-            tensor_g = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_g
-            mask_g = dist_knn <= tensor_g
-            edge_index_g = edge_index_knn[:, mask_g]
-            edge_index_g, dist_g = self.get_edge_info(edge_index_g, pos)
-
-            # Compute pairwise distances in local layer
-            tensor_l = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_l
-            mask_l = dist_knn <= tensor_l
-            edge_index_l = edge_index_knn[:, mask_l]
-            edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
-        elif self.dataset == "RNA-PDB":
-            x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
-            x = torch.index_select(self.embeddings, 0, x_raw[:, -1].long())
+            x = self.embeddings(x_raw[:, -1].long())
             time_emb = self.time_mlp(t)
-            x = torch.cat([x, time_emb], dim=1)
             pos = x_raw[:,:3].contiguous()
+            x_pos = self.init_linear(pos) # coordinates embeddings
+            x = x + x_pos
+            x = torch.cat([x, time_emb], dim=1)
+            
 
-            row, col = knn(pos, pos, 50, batch, batch) # TODO: Do we need 50 clusters? Maybe less...?
+            row, col = knn(pos, pos, 6, batch, batch) # TODO: Do we need 50 clusters? Maybe less...?
             edge_index_knn = torch.stack([row, col], dim=0)
             edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
 
@@ -253,7 +196,7 @@ class PAMNet(nn.Module):
         out = torch.cat((torch.cat(out_global, 0), torch.cat(out_local, 0)), -1)
         out = (out * att_weight)
         out = out.sum(dim=0)
-        out = self.mlp_out(out)
+        out = self.out_linear(out)
 
         return out
 

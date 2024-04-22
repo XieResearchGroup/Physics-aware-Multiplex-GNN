@@ -14,8 +14,8 @@
                 "--dataset",
                 "RNA-PDB",
                 "--epochs=1000",
-                "--batch_size=32",
-                "--dim=16",
+                "--batch_size=16",
+                "--dim=128",
                 "--n_layer=4",
                 "--lr=1e-3"
             ]

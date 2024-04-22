@@ -79,7 +79,7 @@ def main():
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g)
 
     model = PAMNet(config).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd, amsgrad=False)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
     
     print("Start training!")
     best_val_loss = None
@@ -87,6 +87,7 @@ def main():
         model.train()
 
         for data, name in train_loader:
+            losses = []
             data = data.to(device)
             optimizer.zero_grad()
 
@@ -96,12 +97,13 @@ def main():
 
             loss.backward()
             optimizer.step()
+            losses.append(loss.item())
         
         # train_loss, _ = test(model, train_loader, device)
         # val_loss, _ = test(model, val_loader, device)
 
         # print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
-        print(f'Epoch: {epoch+1}, Loss: {loss.item()}')
+        print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}')
         
         # save_folder = os.path.join(".", "save", args.dataset)
         # if not os.path.exists(save_folder):

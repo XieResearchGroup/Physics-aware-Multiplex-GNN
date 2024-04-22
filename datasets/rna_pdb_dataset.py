@@ -39,6 +39,8 @@ class RNAPDBDataset(Dataset):
         sample = self.load_pickle(path)
         atoms_types = self.to_tensor(sample['atoms']).unsqueeze(1).float()
         atoms_pos = self.to_tensor(sample['pos']).float()
+        atoms_pos_mean = atoms_pos.mean(dim=0)
+        atoms_pos -= atoms_pos_mean # Center around point (0,0,0)
         atoms_pos /= 10
         indicator = self.to_tensor(sample['indicator'])
         name = sample['name']
