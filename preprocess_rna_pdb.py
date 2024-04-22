@@ -82,11 +82,12 @@ def construct_graphs(data_dir, save_dir, data_name, save_name):
 
 
 def main():
-    data_dir = os.path.join(".", "data", "RNA-PDB")
-    # data_dir = "/data/3d/input_data/"
+    # data_dir = os.path.join(".", "data", "RNA-PDB")
+    data_dir = "/data/3d/input_data/"
     save_dir = os.path.join(".", "data", "RNA-PDB")
-    # "diffusion-desc-pdbs"
-    construct_graphs(data_dir, save_dir, "train-pdb" , "train-pkl")
+    
+    construct_graphs(data_dir, save_dir, "diffusion-desc-pdbs" , "train-pkl")
+    # construct_graphs(data_dir, save_dir, "train-pdb" , "train-pkl")
     # construct_graphs(data_dir, save_dir, "val-pdb", "val-pkl")
 
 if __name__ == "__main__":

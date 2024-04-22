@@ -44,7 +44,6 @@ class PAMNet(nn.Module):
 
         self.embeddings = nn.Embedding(4, self.dim)
         self.init_linear = MLP([3, self.dim])
-        self.l_attn = nn.MultiheadAttention(2*self.dim+self.time_dim, 1)
 
         self.rbf_g = BesselBasisLayer(16, self.cutoff_g, envelope_exponent)
         self.rbf_l = BesselBasisLayer(16, self.cutoff_l, envelope_exponent)
@@ -70,7 +69,7 @@ class PAMNet(nn.Module):
         for _ in range(config.n_layer):
             self.local_layer.append(Local_MessagePassing(2*self.dim+self.time_dim))
 
-        self.out_linear = nn.Linear(6, 3, bias=False)
+        self.out_linear = nn.Linear(9, 3, bias=False)
 
         self.softmax = nn.Softmax(dim=-1)
 
@@ -126,7 +125,7 @@ class PAMNet(nn.Module):
             # x = torch.cat([x, time_emb], dim=1)
             
 
-            row, col = knn(pos, pos, 20, batch, batch) # TODO: Do we need 50 clusters? Maybe less...?
+            row, col = knn(pos, pos, 5, batch, batch) # TODO: Do we need 50 clusters? Maybe less...?
             edge_index_knn = torch.stack([row, col], dim=0)
             edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
 
@@ -186,7 +185,6 @@ class PAMNet(nn.Module):
 
             x, out_l, att_score_l = self.local_layer[layer](x, edge_attr_rbf_l, edge_attr_sbf2, edge_attr_sbf1, \
                                                     idx_kj, idx_ji, idx_jj_pair, idx_ji_pair, edge_index_l)
-            x, _ = self.l_attn(x, x, x)
             out_local.append(out_l)
             att_score_local.append(att_score_l)
         
@@ -198,6 +196,7 @@ class PAMNet(nn.Module):
         out = torch.cat((torch.cat(out_global, 0), torch.cat(out_local, 0)), -1)
         out = (out * att_weight)
         out = out.sum(dim=0)
+        out = torch.cat((out, pos), dim=1)
         out = self.out_linear(out)
 
         return out

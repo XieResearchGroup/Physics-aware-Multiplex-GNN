@@ -76,7 +76,7 @@ def main():
     for data, name in train_loader:
         print(data)
         break
-    
+
     sampler = Sampler(timesteps=args.timesteps)
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g)
 
@@ -95,6 +95,8 @@ def main():
 
             t = torch.randint(0, args.timesteps, (args.batch_size,), device=device).long() # Generate random timesteps
             graphs_t = t[data.batch]
+            # t = torch.randint(0, args.timesteps, (1,), device=device).long()
+            # graphs_t = t.repeat(data.batch.shape[0])
 
             loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
 
