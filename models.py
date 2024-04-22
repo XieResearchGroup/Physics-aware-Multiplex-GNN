@@ -69,7 +69,7 @@ class PAMNet(nn.Module):
         for _ in range(config.n_layer):
             self.local_layer.append(Local_MessagePassing(2*self.dim+self.time_dim))
 
-        self.out_linear = nn.Linear(9, 3, bias=False)
+        self.out_linear = nn.Linear(9, 3)
 
         self.softmax = nn.Softmax(dim=-1)
 
