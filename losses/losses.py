@@ -9,15 +9,16 @@ def p_losses(denoise_model,
              loss_type="huber",
              noise=None,
              ):
-    if noise is None:
-        noise = torch.randn_like(x_data)
 
-    x_noisy = sampler.q_sample(x_start=x_data,
+    x_pos = x_data.x[:, :3]  # Get the position of the atoms. First 3 features are the coordinates
+    if noise is None:
+        noise = torch.randn_like(x_pos)
+    x_noisy = sampler.q_sample(x_start=x_pos,
                                t=t,
                                noise=noise,
                                )
-    
-    predicted_noise = denoise_model(x_noisy, t) # TODO: Model aware of the timestep t?
+    x_data.x[:, 3] = x_noisy  # Replace the position of the atoms with the noisy data
+    predicted_noise = denoise_model(x_data, t)
 
     if loss_type == 'l1':
         loss = F.l1_loss(noise, predicted_noise)

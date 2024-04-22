@@ -3,7 +3,6 @@ import torch.nn as nn
 from torch.nn import Sequential, Linear
 
 import sympy as sym
-from math import pi as PI
 
 from utils import bessel_basis, real_sph_harm
 
@@ -63,10 +62,10 @@ class BesselBasisLayer(torch.nn.Module):
 
         self.freq = torch.nn.Parameter(torch.Tensor(num_radial))
 
-        self.reset_parameters()
+        # self.reset_parameters()
 
     def reset_parameters(self):
-        torch.arange(1, self.freq.numel() + 1, out=self.freq).mul_(PI)
+        torch.arange(1, self.freq.numel() + 1, out=self.freq).mul_(torch.pi)
 
     def forward(self, dist):
         dist = dist.unsqueeze(-1) / self.cutoff

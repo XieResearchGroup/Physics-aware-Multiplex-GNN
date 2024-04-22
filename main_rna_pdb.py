@@ -15,11 +15,9 @@ from losses import p_losses
 
 def set_seed(seed):
     torch.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
     random.seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.benchmark = False
 
 def test(model, loader, device):
     model.eval()
@@ -88,11 +86,11 @@ def main():
     for epoch in range(args.epochs):
         model.train()
 
-        for data in train_loader:
+        for data, name in train_loader:
             data = data.to(device)
             optimizer.zero_grad()
 
-            t = torch.randint(0, args.timesteps, (data.batch.shape,), device=device).long() # Generate random timesteps
+            t = torch.randint(0, args.timesteps, (data.batch.shape[0],), device=device).long() # Generate random timesteps
 
             loss = p_losses(model, data, t, sampler=sampler, loss_type="huber")
 
