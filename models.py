@@ -17,6 +17,20 @@ class Config(object):
         self.cutoff_l = cutoff_l
         self.cutoff_g = cutoff_g
 
+class SinusoidalPositionEmbeddings(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.dim = dim
+
+    def forward(self, time):
+        device = time.device
+        half_dim = self.dim // 2
+        embeddings = math.log(10000) / (half_dim - 1)
+        embeddings = torch.exp(torch.arange(half_dim, device=device) * -embeddings)
+        embeddings = time[:, None] * embeddings[None, :]
+        embeddings = torch.cat((embeddings.sin(), embeddings.cos()), dim=-1)
+        return embeddings
+
 class PAMNet(nn.Module):
     def __init__(self, config: Config, num_spherical=7, num_radial=6, envelope_exponent=5):
         super(PAMNet, self).__init__()
@@ -38,6 +52,14 @@ class PAMNet(nn.Module):
         self.mlp_rbf_l = MLP([16, self.dim])    
         self.mlp_sbf1 = MLP([num_spherical * num_radial, self.dim])
         self.mlp_sbf2 = MLP([num_spherical * num_radial, self.dim])
+
+        self.time_dim = 8
+        self.time_mlp = nn.Sequential(
+            SinusoidalPositionEmbeddings(self.dim),
+            nn.Linear(self.dim, self.time_dim),
+            nn.GELU(),
+            nn.Linear(self.time_dim, self.time_dim),
+        )
 
         self.global_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
@@ -93,7 +115,7 @@ class PAMNet(nn.Module):
 
         return idx_i, idx_j, idx_k, idx_kj, idx_ji, idx_i_pair, idx_j1_pair, idx_j2_pair, idx_jj_pair, idx_ji_pair
 
-    def forward(self, data):
+    def forward(self, data, t=None):
         x_raw = data.x
         batch = data.batch # This parameter assigns an index to each node in the graph, indicating which graph it belongs to.
 
@@ -151,6 +173,10 @@ class PAMNet(nn.Module):
             mask_l = dist_knn <= tensor_l
             edge_index_l = edge_index_knn[:, mask_l]
             edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
+        elif self.dataset == "RNA-PDB":
+            time_emb = self.time_mlp(t)
+
+            # h = torch.cat([h, time_emb], dim=1)
 
         else:
             raise ValueError("Invalid dataset.")
