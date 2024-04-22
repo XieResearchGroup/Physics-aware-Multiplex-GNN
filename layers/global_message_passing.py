@@ -7,9 +7,9 @@ from layers import MLP, Res
 
 
 class Global_MessagePassing(MessagePassing):
-    def __init__(self, config):
+    def __init__(self, dim):
         super(Global_MessagePassing, self).__init__()
-        self.dim = config.dim
+        self.dim = dim
 
         self.mlp_x1 = MLP([self.dim, self.dim])
         self.mlp_x2 = MLP([self.dim, self.dim])
@@ -22,8 +22,8 @@ class Global_MessagePassing(MessagePassing):
         self.W_edge_attr = nn.Linear(self.dim, self.dim, bias=False)
 
         self.mlp_out = MLP([self.dim, self.dim, self.dim, self.dim])
-        self.W_out = nn.Linear(self.dim, 1)
-        self.W = nn.Parameter(torch.Tensor(self.dim, 1))
+        self.W_out = nn.Linear(self.dim, 3)
+        self.W = nn.Parameter(torch.Tensor(self.dim, 3))
 
         self.init()
 

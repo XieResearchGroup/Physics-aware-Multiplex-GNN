@@ -39,6 +39,7 @@ class RNAPDBDataset(Dataset):
         sample = self.load_pickle(path)
         atoms_types = self.to_tensor(sample['atoms']).unsqueeze(1).float()
         atoms_pos = self.to_tensor(sample['pos']).float()
+        atoms_pos /= 10
         indicator = self.to_tensor(sample['indicator'])
         name = sample['name']
         data_x = torch.cat((atoms_pos, atoms_types), dim=1)

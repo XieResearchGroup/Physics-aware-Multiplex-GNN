@@ -51,8 +51,8 @@ def main():
     parser.add_argument('--n_layer', type=int, default=2, help='Number of hidden layers.')
     parser.add_argument('--dim', type=int, default=64, help='Size of input hidden units.')
     parser.add_argument('--batch_size', type=int, default=8, help='batch_size')
-    parser.add_argument('--cutoff_l', type=float, default=2.6, help='cutoff in local layer')
-    parser.add_argument('--cutoff_g', type=float, default=20.0, help='cutoff in global layer')
+    parser.add_argument('--cutoff_l', type=float, default=0.26, help='cutoff in local layer')
+    parser.add_argument('--cutoff_g', type=float, default=2.00, help='cutoff in global layer')
     parser.add_argument('--timesteps', type=int, default=500, help='timesteps')
     args = parser.parse_args()
     
@@ -94,23 +94,22 @@ def main():
 
             loss = p_losses(model, data, t, sampler=sampler, loss_type="huber")
 
-            output = model(data)
-            loss = F.smooth_l1_loss(output, data.y)
             loss.backward()
             optimizer.step()
         
-        train_loss, _ = test(model, train_loader, device)
-        val_loss, _ = test(model, val_loader, device)
+        # train_loss, _ = test(model, train_loader, device)
+        # val_loss, _ = test(model, val_loader, device)
 
-        print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
+        # print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
+        print(f'Epoch: {epoch+1}, Loss: {loss.item()}')
         
-        save_folder = os.path.join(".", "save", args.dataset)
-        if not os.path.exists(save_folder):
-            os.makedirs(save_folder)
+        # save_folder = os.path.join(".", "save", args.dataset)
+        # if not os.path.exists(save_folder):
+        #     os.makedirs(save_folder)
 
-        if best_val_loss is None or val_loss < best_val_loss:
-            best_val_loss = val_loss
-            torch.save(model.state_dict(), os.path.join(save_folder, "best_model.h5"))
+        # if best_val_loss is None or val_loss < best_val_loss:
+        #     best_val_loss = val_loss
+        #     torch.save(model.state_dict(), os.path.join(save_folder, "best_model.h5"))
 
 
 if __name__ == "__main__":

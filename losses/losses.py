@@ -17,7 +17,7 @@ def p_losses(denoise_model,
                                t=t,
                                noise=noise,
                                )
-    x_data.x[:, 3] = x_noisy  # Replace the position of the atoms with the noisy data
+    x_data.x[:, :3] = x_noisy  # Replace the position of the atoms with the noisy data
     predicted_noise = denoise_model(x_data, t)
 
     if loss_type == 'l1':

@@ -13,11 +13,11 @@
             "args": [
                 "--dataset",
                 "RNA-PDB",
-                "--epochs=15",
-                "--batch_size=4",
+                "--epochs=1000",
+                "--batch_size=32",
                 "--dim=16",
-                "--n_layer=1",
-                "--lr=1e-4"
+                "--n_layer=4",
+                "--lr=1e-3"
             ]
         },
         {

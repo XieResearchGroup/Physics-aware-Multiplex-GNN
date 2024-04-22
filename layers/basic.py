@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn import Sequential, Linear
+from torch.nn import ReLU
 
 import sympy as sym
 
@@ -17,7 +18,7 @@ class SiLU(nn.Module):
 
 def MLP(channels):
     return Sequential(*[
-        Sequential(Linear(channels[i - 1], channels[i]), SiLU())
+        Sequential(Linear(channels[i - 1], channels[i]), ReLU())
         for i in range(1, len(channels))])
 
 

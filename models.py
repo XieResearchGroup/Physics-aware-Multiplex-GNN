@@ -32,11 +32,12 @@ class SinusoidalPositionEmbeddings(nn.Module):
         return embeddings
 
 class PAMNet(nn.Module):
-    def __init__(self, config: Config, num_spherical=7, num_radial=6, envelope_exponent=5):
+    def __init__(self, config: Config, num_spherical=7, num_radial=6, envelope_exponent=5, time_dim=8):
         super(PAMNet, self).__init__()
 
         self.dataset = config.dataset
         self.dim = config.dim
+        self.time_dim = time_dim
         self.n_layer = config.n_layer
         self.cutoff_l = config.cutoff_l
         self.cutoff_g = config.cutoff_g
@@ -48,12 +49,11 @@ class PAMNet(nn.Module):
         self.rbf_l = BesselBasisLayer(16, self.cutoff_l, envelope_exponent)
         self.sbf = SphericalBasisLayer(num_spherical, num_radial, self.cutoff_l, envelope_exponent)
 
-        self.mlp_rbf_g = MLP([16, self.dim])
-        self.mlp_rbf_l = MLP([16, self.dim])    
-        self.mlp_sbf1 = MLP([num_spherical * num_radial, self.dim])
-        self.mlp_sbf2 = MLP([num_spherical * num_radial, self.dim])
+        self.mlp_rbf_g = MLP([16, self.dim+self.time_dim])
+        self.mlp_rbf_l = MLP([16, self.dim+self.time_dim])    
+        self.mlp_sbf1 = MLP([num_spherical * num_radial, self.dim+self.time_dim])
+        self.mlp_sbf2 = MLP([num_spherical * num_radial, self.dim+self.time_dim])
 
-        self.time_dim = 8
         self.time_mlp = nn.Sequential(
             SinusoidalPositionEmbeddings(self.dim),
             nn.Linear(self.dim, self.time_dim),
@@ -63,11 +63,13 @@ class PAMNet(nn.Module):
 
         self.global_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.global_layer.append(Global_MessagePassing(config))
+            self.global_layer.append(Global_MessagePassing(self.dim+self.time_dim))
 
         self.local_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.local_layer.append(Local_MessagePassing(config))
+            self.local_layer.append(Local_MessagePassing(self.dim+self.time_dim))
+
+        self.mlp_out = nn.Linear(6, 3)
 
         self.softmax = nn.Softmax(dim=-1)
 
@@ -174,9 +176,27 @@ class PAMNet(nn.Module):
             edge_index_l = edge_index_knn[:, mask_l]
             edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
         elif self.dataset == "RNA-PDB":
+            x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
+            x = torch.index_select(self.embeddings, 0, x_raw[:, -1].long())
             time_emb = self.time_mlp(t)
+            x = torch.cat([x, time_emb], dim=1)
+            pos = x_raw[:,:3].contiguous()
 
-            # h = torch.cat([h, time_emb], dim=1)
+            row, col = knn(pos, pos, 50, batch, batch) # TODO: Do we need 50 clusters? Maybe less...?
+            edge_index_knn = torch.stack([row, col], dim=0)
+            edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
+
+            # Compute pairwise distances in global layer
+            tensor_g = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_g
+            mask_g = dist_knn <= tensor_g
+            edge_index_g = edge_index_knn[:, mask_g]
+            edge_index_g, dist_g = self.get_edge_info(edge_index_g, pos)
+
+            # Compute pairwise distances in local layer
+            tensor_l = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_l
+            mask_l = dist_knn <= tensor_l
+            edge_index_l = edge_index_knn[:, mask_l]
+            edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
 
         else:
             raise ValueError("Invalid dataset.")
@@ -186,7 +206,7 @@ class PAMNet(nn.Module):
         # Compute two-hop angles in local layer
         pos_ji, pos_kj = pos[idx_j] - pos[idx_i], pos[idx_k] - pos[idx_j]
         a = (pos_ji * pos_kj).sum(dim=-1)
-        b = torch.cross(pos_ji, pos_kj).norm(dim=-1)
+        b = torch.linalg.cross(pos_ji, pos_kj).norm(dim=-1)
         angle2 = torch.atan2(b, a)
 
         # Compute one-hop angles in local layer
@@ -195,7 +215,7 @@ class PAMNet(nn.Module):
         pos_j2_pair = pos[idx_j2_pair]
         pos_ji_pair, pos_jj_pair = pos_j1_pair - pos_i_pair, pos_j2_pair - pos_j1_pair
         a = (pos_ji_pair * pos_jj_pair).sum(dim=-1)
-        b = torch.cross(pos_ji_pair, pos_jj_pair).norm(dim=-1)
+        b = torch.linalg.cross(pos_ji_pair, pos_jj_pair).norm(dim=-1)
         angle1 = torch.atan2(b, a)
 
         # Get rbf and sbf embeddings
@@ -231,19 +251,11 @@ class PAMNet(nn.Module):
         att_weight = self.softmax(att_score)
 
         out = torch.cat((torch.cat(out_global, 0), torch.cat(out_local, 0)), -1)
-        out = (out * att_weight).sum(dim=-1)
-        out = out.sum(dim=0).unsqueeze(-1)
+        out = (out * att_weight)
+        out = out.sum(dim=0)
+        out = self.mlp_out(out)
 
-        if self.dataset == "QM9":
-            out = global_add_pool(out, batch)
-        elif self.dataset == "PDBbind":
-            out = out * all_index.unsqueeze(-1)
-            out = global_add_pool(out, batch)
-        elif self.dataset == "RNA-Puzzles":
-            out = global_mean_pool(out, batch)
-        else:
-            raise ValueError("Invalid dataset.")
-        return out.view(-1)
+        return out
 
 
 class PAMNet_s(nn.Module):
