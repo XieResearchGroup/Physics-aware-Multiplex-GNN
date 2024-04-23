@@ -16,7 +16,7 @@
                 "--epochs=1000",
                 "--batch_size=32",
                 "--dim=128",
-                "--n_layer=2",
+                "--n_layer=8",
                 "--lr=1e-3"
             ]
         },

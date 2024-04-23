@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 from rdkit import Chem
 import pickle
+from Bio.PDB import PDBParser
 
 
 def load_molecule(molecule_file):
@@ -20,6 +21,22 @@ def load_molecule(molecule_file):
         raise ValueError("Unable to read non None Molecule Object")
     xyz = get_xyz_from_mol(my_mol)
     return xyz, my_mol
+
+def load_with_bio(molecule_file):
+    parser = PDBParser()
+    structure = parser.get_structure("rna", molecule_file)
+    coords = []
+    atoms_elements = []
+    atoms_names = []
+    for model in structure:
+        for chain in model:
+            for residue in chain:
+                for atom in residue:
+                    coords.append(atom.get_coord())
+                    atoms_elements.append(atom.element)
+                    atoms_names.append(atom.get_name())
+                    assert len(coords) == len(atoms_elements) == len(atoms_names)
+    return np.array(coords), atoms_elements, atoms_names
 
 def get_xyz_from_mol(mol):
     xyz = np.zeros((mol.GetNumAtoms(), 3))
@@ -48,32 +65,33 @@ def construct_graphs(data_dir, save_dir, data_name, save_name):
         rna_file = os.path.join(data_dir_full, name)
         
         try:
-            rna_coords, rna_mol = load_molecule(rna_file)
+            rna_coords, elements, symbols = load_with_bio(rna_file)
         except ValueError:
             print("Error reading molecule", rna_file)
             continue
 
-        rna_x = list()
-        for atom_id in rna_mol.GetAtoms():
-            rna_x.append(atom_id.GetAtomicNum())
-
-        x_indices = [i for i,x in enumerate(rna_x) if (x == 6 or x == 7 or x == 8)] # Remove Hydrogen, ions, etc. Keep only C, N, O
-        rna_x = np.array([rna_x[i] for i in x_indices])
+        x_indices = [i for i,x in enumerate(elements) if (x != 'H' and x != 'X')] # Remove Hydrogen, ions, etc. Keep only C, N, O, P
+        elements = [elements[i] for i in x_indices]
+        symbols = [symbols[i] for i in x_indices]
         rna_pos = np.array(rna_coords[x_indices])
 
         types = {
-            6: 0,   #C
-            7: 1,   #N
-            8: 2,   #O
+            'C': 0,   #C
+            'N': 1,   #N
+            'O': 2,   #O
+            'P': 3,   #P
         }
 
-        rna_x = np.array([types[x] for x in rna_x]) # Convert atomic numbers to types
+        rna_x = np.array([types[x] for x in elements]) # Convert atomic numbers to types
+
+        assert len(rna_x) == len(rna_pos) == len(symbols)
 
         # Assign a unique label to each graph (RNA molecule).
         indicator = np.ones((rna_x.shape[0], 1)) * (i + 1)
         data = {}
         data['atoms'] = rna_x
         data['pos'] = rna_pos
+        data['symbols'] = symbols
         data['indicator'] = indicator
         data['name'] = name
 

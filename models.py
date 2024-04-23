@@ -69,7 +69,7 @@ class PAMNet(nn.Module):
         for _ in range(config.n_layer):
             self.local_layer.append(Local_MessagePassing(2*self.dim+self.time_dim))
 
-        self.out_linear = nn.Linear(9, 3)
+        self.out_linear = nn.Linear(6, 3)
 
         self.softmax = nn.Softmax(dim=-1)
 
@@ -196,7 +196,7 @@ class PAMNet(nn.Module):
         out = torch.cat((torch.cat(out_global, 0), torch.cat(out_local, 0)), -1)
         out = (out * att_weight)
         out = out.sum(dim=0)
-        out = torch.cat((out, pos), dim=1)
+        # out = torch.cat((out, pos), dim=1)
         out = self.out_linear(out)
 
         return out

@@ -5,6 +5,7 @@ import pickle
 from torch_geometric.data import Data, Dataset
 
 class RNAPDBDataset(Dataset):
+    backbone_atoms = ['P', 'O5\'', 'C5\'', 'C4\'', 'C3\'', 'O3\'']
     
     def __init__(self,
                  path: str,
@@ -43,9 +44,14 @@ class RNAPDBDataset(Dataset):
         atoms_pos -= atoms_pos_mean # Center around point (0,0,0)
         atoms_pos /= 10
         indicator = self.to_tensor(sample['indicator'])
+        atoms_pos, atoms_types = self.backbone_only(atoms_pos, atoms_types, sample['symbols'])
         name = sample['name']
         data_x = torch.cat((atoms_pos, atoms_types), dim=1)
         return data_x, indicator, name
+
+    def backbone_only(self, atom_pos, atom_types, atom_symbols):
+        mask = [True if atom in self.backbone_atoms else False for atom in atom_symbols]
+        return atom_pos[mask], atom_types[mask]
 
     @property
     def raw_file_names(self):
