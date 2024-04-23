@@ -41,18 +41,19 @@ class PAMNet(nn.Module):
         self.n_layer = config.n_layer
         self.cutoff_l = config.cutoff_l
         self.cutoff_g = config.cutoff_g
+        self.atom_dim = 4
 
-        self.embeddings = nn.Embedding(4, self.dim)
+        # self.embeddings = nn.Embedding(4, self.dim)
         self.init_linear = MLP([3, self.dim])
 
         self.rbf_g = BesselBasisLayer(16, self.cutoff_g, envelope_exponent)
         self.rbf_l = BesselBasisLayer(16, self.cutoff_l, envelope_exponent)
         self.sbf = SphericalBasisLayer(num_spherical, num_radial, self.cutoff_l, envelope_exponent)
 
-        self.mlp_rbf_g = MLP([16, 2*self.dim+self.time_dim])
-        self.mlp_rbf_l = MLP([16, 2*self.dim+self.time_dim])    
-        self.mlp_sbf1 = MLP([num_spherical * num_radial, 2*self.dim+self.time_dim])
-        self.mlp_sbf2 = MLP([num_spherical * num_radial, 2*self.dim+self.time_dim])
+        self.mlp_rbf_g = MLP([16, self.dim+self.atom_dim+self.time_dim])
+        self.mlp_rbf_l = MLP([16, self.dim+self.atom_dim+self.time_dim])    
+        self.mlp_sbf1 = MLP([num_spherical * num_radial, self.dim+self.atom_dim+self.time_dim])
+        self.mlp_sbf2 = MLP([num_spherical * num_radial, self.dim+self.atom_dim+self.time_dim])
 
         self.time_mlp = nn.Sequential(
             SinusoidalPositionEmbeddings(self.dim),
@@ -63,13 +64,13 @@ class PAMNet(nn.Module):
 
         self.global_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.global_layer.append(Global_MessagePassing(2*self.dim+self.time_dim))
+            self.global_layer.append(Global_MessagePassing(self.dim+self.atom_dim+self.time_dim))
 
         self.local_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.local_layer.append(Local_MessagePassing(2*self.dim+self.time_dim))
+            self.local_layer.append(Local_MessagePassing(self.dim+self.atom_dim+self.time_dim))
 
-        self.out_linear = nn.Linear(6, 3)
+        self.out_linear = nn.Linear(9+self.time_dim, 3)
 
         self.softmax = nn.Softmax(dim=-1)
 
@@ -117,11 +118,11 @@ class PAMNet(nn.Module):
 
         if self.dataset == "RNA-PDB":
             x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
-            x = self.embeddings(x_raw[:, -1].long())
+            x = x_raw[:, 3:]  # one-hot encoded atom types
             time_emb = self.time_mlp(t)
             pos = x_raw[:,:3].contiguous()
             x_pos = self.init_linear(pos) # coordinates embeddings
-            x = torch.cat([x, x_pos, time_emb], dim=1)
+            x = torch.cat([x_pos, x, time_emb], dim=1)
             # x = torch.cat([x, time_emb], dim=1)
             
 
@@ -196,7 +197,7 @@ class PAMNet(nn.Module):
         out = torch.cat((torch.cat(out_global, 0), torch.cat(out_local, 0)), -1)
         out = (out * att_weight)
         out = out.sum(dim=0)
-        # out = torch.cat((out, pos), dim=1)
+        out = torch.cat((out, pos, time_emb), dim=1)
         out = self.out_linear(out)
 
         return out

@@ -46,6 +46,9 @@ class RNAPDBDataset(Dataset):
         indicator = self.to_tensor(sample['indicator'])
         atoms_pos, atoms_types = self.backbone_only(atoms_pos, atoms_types, sample['symbols'])
         name = sample['name']
+        # convert atom_types to one-hot encoding (C, O, N, P)
+        atoms_types = torch.nn.functional.one_hot(atoms_types.to(torch.int64), num_classes=4).float()
+        atoms_types = atoms_types.squeeze(1)
         data_x = torch.cat((atoms_pos, atoms_types), dim=1)
         return data_x, indicator, name
 
