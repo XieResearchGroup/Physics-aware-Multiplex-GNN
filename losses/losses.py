@@ -17,8 +17,10 @@ def p_losses(denoise_model,
                                t=t,
                                noise=noise,
                                )
-    x_data.x = x_noisy  # Replace the position of the atoms with the noisy data
+    x_noisy = torch.cat((x_noisy[:,:3], x_data.x[:,3:]), dim=1)
+    x_data.x = x_noisy
     predicted_noise = denoise_model(x_data, t)
+    noise[:, 3:] = x_start[:, 3:]  # masked coords
 
     if loss_type == 'l1':
         loss = F.l1_loss(noise, predicted_noise)
