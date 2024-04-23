@@ -1,4 +1,3 @@
-import os
 import os.path as osp
 import argparse
 import numpy as np
@@ -8,6 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
+import wandb
 
 from models import PAMNet, Config
 from datasets import RNAPDBDataset
@@ -56,8 +56,12 @@ def main():
     parser.add_argument('--cutoff_l', type=float, default=0.26, help='cutoff in local layer')
     parser.add_argument('--cutoff_g', type=float, default=2.00, help='cutoff in global layer')
     parser.add_argument('--timesteps', type=int, default=500, help='timesteps')
+    parser.add_argument('--wandb', action='store_true', help='Use wandb for logging')
     args = parser.parse_args()
     
+    if args.wandb:
+        wandb.login()
+        wandb.init(project='RNA-GNN-Diffusion', entity='pamnet')
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if torch.cuda.is_available():
@@ -66,7 +70,7 @@ def main():
 
     # Creat dataset
     path = osp.join('.', 'data', args.dataset)
-    train_dataset = RNAPDBDataset(path, name='train-pkl').shuffle()
+    train_dataset = RNAPDBDataset(path, name='train-raw-pkl').shuffle()
     val_dataset = RNAPDBDataset(path, name='val-pkl')
 
     # Load dataset
@@ -87,9 +91,10 @@ def main():
     best_val_loss = None
     for epoch in range(args.epochs):
         model.train()
-
+        step = 0
+        losses = []
         for data, name in train_loader:
-            losses = []
+            
             data = data.to(device)
             optimizer.zero_grad()
 
@@ -103,16 +108,23 @@ def main():
             loss.backward()
             optimizer.step()
             losses.append(loss.item())
+            # if step % 100 == 0:
+            #     print(f"Step: {step}, Loss: {loss.item():.4f}")
         
         # train_loss, _ = test(model, train_loader, device)
         # val_loss, _ = test(model, val_loader, device)
 
         # print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
+        if args.wandb:
+            wandb.log({'Train Loss': np.mean(losses), 'Epoch': epoch+1})
         print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}')
         
         # save_folder = os.path.join(".", "save", args.dataset)
         # if not os.path.exists(save_folder):
         #     os.makedirs(save_folder)
+
+        if epoch %100 == 0:
+            torch.save(model.state_dict(), f"./save/{args.dataset}/model_{epoch}.h5")
 
         # if best_val_loss is None or val_loss < best_val_loss:
         #     best_val_loss = val_loss
