@@ -25,8 +25,8 @@ class Local_MessagePassing(torch.nn.Module):
         self.mlp_x2 = MLP([self.dim, self.dim])
         
         self.mlp_out = MLP([self.dim, self.dim, self.dim, self.dim])
-        self.W_out = nn.Linear(self.dim, 3)
-        self.W = nn.Parameter(torch.Tensor(self.dim, 3))
+        self.W_out = nn.Linear(self.dim, 7)
+        self.W = nn.Parameter(torch.Tensor(self.dim, 7))
 
         self.init()
 

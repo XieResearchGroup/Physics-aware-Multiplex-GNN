@@ -10,14 +10,14 @@ def p_losses(denoise_model,
              noise=None,
              ):
 
-    x_pos = x_data.x[:, :3].contiguous()  # Get the position of the atoms. First 3 features are the coordinates
+    x_start = x_data.x.contiguous()  # Get the position of the atoms. First 3 features are the coordinates
     if noise is None:
-        noise = torch.randn_like(x_pos)
-    x_noisy = sampler.q_sample(x_start=x_pos,
+        noise = torch.randn_like(x_start)
+    x_noisy = sampler.q_sample(x_start=x_start,
                                t=t,
                                noise=noise,
                                )
-    x_data.x[:, :3] = x_noisy  # Replace the position of the atoms with the noisy data
+    x_data.x = x_noisy  # Replace the position of the atoms with the noisy data
     predicted_noise = denoise_model(x_data, t)
 
     if loss_type == 'l1':

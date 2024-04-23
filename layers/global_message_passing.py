@@ -22,8 +22,8 @@ class Global_MessagePassing(MessagePassing):
         self.W_edge_attr = nn.Linear(self.dim, self.dim, bias=False)
 
         self.mlp_out = MLP([self.dim, self.dim, self.dim, self.dim])
-        self.W_out = nn.Linear(self.dim, 3)
-        self.W = nn.Parameter(torch.Tensor(self.dim, 3))
+        self.W_out = nn.Linear(self.dim, 7)
+        self.W = nn.Parameter(torch.Tensor(self.dim, 7))
 
         self.init()
 

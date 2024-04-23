@@ -104,7 +104,6 @@ class Sampler():
         if noise is None:
             noise = torch.randn_like(x_start)
         
-        assert x_start.shape[1] in [1, 2, 3]
 
         sqrt_alphas_cumprod_t = self.extract(self.sqrt_alphas_cumprod, t, x_start.shape)
         sqrt_one_minus_alphas_cumprod_t = self.extract(
