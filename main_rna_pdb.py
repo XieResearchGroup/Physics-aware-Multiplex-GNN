@@ -21,26 +21,16 @@ def set_seed(seed):
     seed_everything(seed)
 
 
-def test(model, loader, device):
+def test(model, loader, device, sampler, args):
     model.eval()
-
-    pred_list = []
-    y_list = []
-
-    for data in loader:
+    losses = []
+    for data, name in loader:
         data = data.to(device)
-        pred = model(data)
-        pred_list += pred.reshape(-1).tolist()
-        y_list += data.y.reshape(-1).tolist()
-
-    pred = np.array(pred_list).reshape(-1,)
-    pred = torch.tensor(pred).to(device)
-
-    y = np.array(y_list).reshape(-1,)
-    y = torch.tensor(y).to(device)
-
-    loss = F.smooth_l1_loss(pred, y)
-    return loss.item(), np.array(pred_list).reshape(-1,)
+        t = torch.randint(0, args.timesteps, (args.batch_size,), device=device).long() # Generate random timesteps
+        graphs_t = t[data.batch]
+        loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
+        losses.append(loss.item())
+    return np.mean(losses)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -70,7 +60,7 @@ def main():
     # Creat dataset
     path = osp.join('.', 'data', args.dataset)
     train_dataset = RNAPDBDataset(path, name='train-raw-pkl').shuffle()
-    val_dataset = RNAPDBDataset(path, name='val-pkl')
+    val_dataset = RNAPDBDataset(path, name='val-raw-pkl')
 
     # Load dataset
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
@@ -99,24 +89,22 @@ def main():
 
             t = torch.randint(0, args.timesteps, (args.batch_size,), device=device).long() # Generate random timesteps
             graphs_t = t[data.batch]
-            # t = torch.randint(0, args.timesteps, (1,), device=device).long()
-            # graphs_t = t.repeat(data.batch.shape[0])
-
+            
             loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
 
             loss.backward()
             optimizer.step()
             losses.append(loss.item())
-            # if step % 100 == 0:
-            #     print(f"Step: {step}, Loss: {loss.item():.4f}")
-        
-        # train_loss, _ = test(model, train_loader, device)
-        # val_loss, _ = test(model, val_loader, device)
+            if step % 100 == 0 and step != 0:
+                print(f"Step: {step}, Loss: {loss.item():.4f}")
+            step += 1
+
+        val_loss = test(model, val_loader, device, sampler, args)
 
         # print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
         if args.wandb:
-            wandb.log({'Train Loss': np.mean(losses)})
-        print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}')
+            wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss})
+        print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}, Val Loss: {val_loss:.4f}')
         
         # save_folder = os.path.join(".", "save", args.dataset)
         # if not os.path.exists(save_folder):
