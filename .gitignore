@@ -2,6 +2,7 @@
 artifacts/*
 data/*
 wandb/*
+save/*
 
 # files
 *.pyc

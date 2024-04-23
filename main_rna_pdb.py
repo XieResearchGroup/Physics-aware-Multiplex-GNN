@@ -49,7 +49,6 @@ def main():
     parser.add_argument('--dataset', type=str, default='RNA-Puzzles', help='Dataset to be used')
     parser.add_argument('--epochs', type=int, default=150, help='Number of epochs to train.')
     parser.add_argument('--lr', type=float, default=5e-4, help='Initial learning rate.')
-    parser.add_argument('--wd', type=float, default=0, help='Weight decay (L2 loss).')
     parser.add_argument('--n_layer', type=int, default=2, help='Number of hidden layers.')
     parser.add_argument('--dim', type=int, default=64, help='Size of input hidden units.')
     parser.add_argument('--batch_size', type=int, default=8, help='batch_size')
@@ -61,7 +60,7 @@ def main():
     
     if args.wandb:
         wandb.login()
-        wandb.init(project='RNA-GNN-Diffusion', entity='pamnet')
+        wandb.init(project='RNA-GNN-Diffusion', config=args)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if torch.cuda.is_available():
@@ -116,7 +115,7 @@ def main():
 
         # print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
         if args.wandb:
-            wandb.log({'Train Loss': np.mean(losses), 'Epoch': epoch+1})
+            wandb.log({'Train Loss': np.mean(losses)})
         print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}')
         
         # save_folder = os.path.join(".", "save", args.dataset)
@@ -124,12 +123,12 @@ def main():
         #     os.makedirs(save_folder)
 
         if epoch %100 == 0:
-            torch.save(model.state_dict(), f"./save/{args.dataset}/model_{epoch}.h5")
+            torch.save(model.state_dict(), f"./save/model_{epoch}.h5")
 
         # if best_val_loss is None or val_loss < best_val_loss:
         #     best_val_loss = val_loss
         #     torch.save(model.state_dict(), os.path.join(save_folder, "best_model.h5"))
-
+    torch.save(model.state_dict(), f"./save/model_{epoch}.h5")
 
 if __name__ == "__main__":
     main()
