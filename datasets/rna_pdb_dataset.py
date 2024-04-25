@@ -11,6 +11,7 @@ class RNAPDBDataset(Dataset):
                  path: str,
                  name: str,
                  file_extension: str='.pkl',
+                 mode: str='backbone'
                  ):
         super(RNAPDBDataset, self).__init__(path)
         self.path = os.path.join(path, name)
@@ -18,6 +19,9 @@ class RNAPDBDataset(Dataset):
         self.files = os.listdir(self.path)
         self.files = [f for f in self.files if f.endswith(file_extension)]
         self.to_tensor = torch.tensor
+        if mode not in ['backbone', 'all', 'coarse-grain']:
+            raise ValueError(f"Invalid mode: {mode}")
+        self.mode = mode
 
     def len(self):
         return len(self.files)
@@ -26,7 +30,6 @@ class RNAPDBDataset(Dataset):
         data_x, batch, name = self.get_raw_sample(idx)
         if self.transform:
             torsions = self.transform(torsions)
-        name = self.files[idx]
         data = Data(
             x=data_x
         )
@@ -44,8 +47,12 @@ class RNAPDBDataset(Dataset):
         atoms_pos -= atoms_pos_mean # Center around point (0,0,0)
         atoms_pos /= 10
         indicator = self.to_tensor(sample['indicator'])
-        atoms_pos, atoms_types = self.backbone_only(atoms_pos, atoms_types, sample['symbols'])
-        name = sample['name']
+        if self.mode == 'backbone':
+            atoms_pos, atoms_types = self.backbone_only(atoms_pos, atoms_types, sample['symbols'])
+        elif self.mode == 'coarse-grain':
+            raise NotImplementedError
+        
+        name = sample['name'].replace('.pkl', '')
         # convert atom_types to one-hot encoding (C, O, N, P)
         atoms_types = torch.nn.functional.one_hot(atoms_types.to(torch.int64), num_classes=4).float()
         atoms_types = atoms_types.squeeze(1)

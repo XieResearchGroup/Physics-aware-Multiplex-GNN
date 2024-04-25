@@ -3,6 +3,8 @@ artifacts/*
 data/*
 wandb/*
 save/*
+tests/test_output/*
 
 # files
 *.pyc
+rna_gnn.egg-info/*

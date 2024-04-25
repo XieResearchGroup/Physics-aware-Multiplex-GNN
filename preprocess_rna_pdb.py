@@ -5,6 +5,14 @@ from rdkit import Chem
 import pickle
 from Bio.PDB import PDBParser
 
+ATOM_TYPES = {
+            'C': 0,   #C
+            'N': 1,   #N
+            'O': 2,   #O
+            'P': 3,   #P
+        }
+
+REV_ATOM_TYPES = {v: k for k, v in ATOM_TYPES.items()}
 
 def load_molecule(molecule_file):
     if ".mol2" in molecule_file:
@@ -75,14 +83,7 @@ def construct_graphs(data_dir, save_dir, data_name, save_name):
         symbols = [symbols[i] for i in x_indices]
         rna_pos = np.array(rna_coords[x_indices])
 
-        types = {
-            'C': 0,   #C
-            'N': 1,   #N
-            'O': 2,   #O
-            'P': 3,   #P
-        }
-
-        rna_x = np.array([types[x] for x in elements]) # Convert atomic numbers to types
+        rna_x = np.array([ATOM_TYPES[x] for x in elements]) # Convert atomic numbers to types
 
         assert len(rna_x) == len(rna_pos) == len(symbols)
 

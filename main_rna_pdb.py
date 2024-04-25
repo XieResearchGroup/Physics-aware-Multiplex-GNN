@@ -11,7 +11,7 @@ import wandb
 
 from models import PAMNet, Config
 from datasets import RNAPDBDataset
-from utils import Sampler
+from utils import Sampler, SampleToPDB
 from losses import p_losses
 
 def set_seed(seed):
@@ -31,6 +31,15 @@ def test(model, loader, device, sampler, args):
         loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
         losses.append(loss.item())
     return np.mean(losses)
+
+def sample_to_pdb(model, loader, device, sampler, args, samples=5):
+    model.eval()
+    for data, name in loader:
+        data = data.to(device)
+        samples = sampler.sample(model, data)
+        s = SampleToPDB(samples[-1])
+        s.to_pdb(name)
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -98,8 +107,9 @@ def main():
             if step % 100 == 0 and step != 0:
                 print(f"Step: {step}, Loss: {loss.item():.4f}")
             step += 1
-
+        
         val_loss = test(model, val_loader, device, sampler, args)
+        sample_to_pdb(model, val_loader, device, sampler, args)
 
         # print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
         if args.wandb:
