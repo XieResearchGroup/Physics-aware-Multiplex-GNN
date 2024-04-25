@@ -14,6 +14,13 @@ ATOM_TYPES = {
 
 REV_ATOM_TYPES = {v: k for k, v in ATOM_TYPES.items()}
 
+RESIDUES = {
+    'A': 0,
+    'G': 1,
+    'U': 2,
+    'C': 3,
+}
+
 def load_molecule(molecule_file):
     if ".mol2" in molecule_file:
         my_mol = Chem.MolFromMol2File(molecule_file, sanitize=False, removeHs=True)

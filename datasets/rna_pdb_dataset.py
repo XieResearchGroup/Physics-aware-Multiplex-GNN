@@ -6,6 +6,12 @@ from torch_geometric.data import Data, Dataset
 
 class RNAPDBDataset(Dataset):
     backbone_atoms = ['P', 'O5\'', 'C5\'', 'C4\'', 'C3\'', 'O3\'']
+    coarse_grain_map = {
+        'A': ["P", "C4'", "N9", "C2", "C6"],
+        'G': ["P", "C4'", "N9", "C2", "C6"],
+        "U": ["P", "C4'", "N1", "C2", "C4"],
+        "C": ["P", "C4'", "N1", "C2", "C4"],
+    }
     
     def __init__(self,
                  path: str,
@@ -50,7 +56,7 @@ class RNAPDBDataset(Dataset):
         if self.mode == 'backbone':
             atoms_pos, atoms_types = self.backbone_only(atoms_pos, atoms_types, sample['symbols'])
         elif self.mode == 'coarse-grain':
-            raise NotImplementedError
+            atoms_pos, atoms_types = self.coarse_grain(atoms_pos, atoms_types, sample['symbols'])
         
         name = sample['name'].replace('.pkl', '')
         # convert atom_types to one-hot encoding (C, O, N, P)
@@ -62,6 +68,9 @@ class RNAPDBDataset(Dataset):
     def backbone_only(self, atom_pos, atom_types, atom_symbols):
         mask = [True if atom in self.backbone_atoms else False for atom in atom_symbols]
         return atom_pos[mask], atom_types[mask]
+    
+    def coarse_grain(self, atom_pos, atom_types, atom_symbols):
+        raise NotImplementedError
 
     @property
     def raw_file_names(self):

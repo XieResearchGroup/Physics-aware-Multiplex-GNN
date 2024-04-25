@@ -32,13 +32,19 @@ def test(model, loader, device, sampler, args):
         losses.append(loss.item())
     return np.mean(losses)
 
-def sample_to_pdb(model, loader, device, sampler, args, samples=5):
+def sample(model, loader, device, sampler, epoch, num_batches=None):
     model.eval()
+    s = SampleToPDB()
+    s_counter = 0
     for data, name in loader:
         data = data.to(device)
-        samples = sampler.sample(model, data)
-        s = SampleToPDB(samples[-1])
-        s.to_pdb(name)
+        samples = sampler.sample(model, data)[-1]
+        s.to_xyz(samples, f"./samples/{epoch}", name)
+
+        s_counter += 1
+        if num_batches is not None and s_counter >= num_batches:
+            break
+
 
 
 def main():
@@ -51,8 +57,8 @@ def main():
     parser.add_argument('--n_layer', type=int, default=2, help='Number of hidden layers.')
     parser.add_argument('--dim', type=int, default=64, help='Size of input hidden units.')
     parser.add_argument('--batch_size', type=int, default=8, help='batch_size')
-    parser.add_argument('--cutoff_l', type=float, default=0.03, help='cutoff in local layer')
-    parser.add_argument('--cutoff_g', type=float, default=0.200, help='cutoff in global layer')
+    parser.add_argument('--cutoff_l', type=float, default=0.35, help='cutoff in local layer')
+    parser.add_argument('--cutoff_g', type=float, default=2.00, help='cutoff in global layer')
     parser.add_argument('--timesteps', type=int, default=500, help='timesteps')
     parser.add_argument('--wandb', action='store_true', help='Use wandb for logging')
     args = parser.parse_args()
@@ -73,7 +79,7 @@ def main():
 
     # Load dataset
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=6, shuffle=False)
     print("Data loaded!")
     for data, name in train_loader:
         print(data)
@@ -109,7 +115,9 @@ def main():
             step += 1
         
         val_loss = test(model, val_loader, device, sampler, args)
-        sample_to_pdb(model, val_loader, device, sampler, args)
+
+        if epoch % 500 == 0:
+            sample(model, val_loader, device, sampler, epoch=epoch, num_batches=1)
 
         # print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
         if args.wandb:
