@@ -19,6 +19,8 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     seed_everything(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def test(model, loader, device, sampler, args):
@@ -76,10 +78,12 @@ def main():
     path = osp.join('.', 'data', args.dataset)
     train_dataset = RNAPDBDataset(path, name='train-raw-pkl').shuffle()
     val_dataset = RNAPDBDataset(path, name='val-raw-pkl')
+    samp_dataset = RNAPDBDataset(path, name='val-raw-pkl')
 
     # Load dataset
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=6, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    samp_loader = DataLoader(samp_dataset, batch_size=6, shuffle=False)
     print("Data loaded!")
     for data, name in train_loader:
         print(data)
@@ -108,6 +112,7 @@ def main():
             loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
 
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0) # prevent exploding gradients
             optimizer.step()
             losses.append(loss.item())
             if step % 100 == 0 and step != 0:
@@ -117,7 +122,7 @@ def main():
         val_loss = test(model, val_loader, device, sampler, args)
 
         if epoch % 500 == 0:
-            sample(model, val_loader, device, sampler, epoch=epoch, num_batches=1)
+            sample(model, samp_loader, device, sampler, epoch=epoch, num_batches=1)
 
         # print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
         if args.wandb:
