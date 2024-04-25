@@ -7,7 +7,7 @@ from layers import MLP, Res
 
 
 class Global_MessagePassing(MessagePassing):
-    def __init__(self, dim, out_dim=7):
+    def __init__(self, dim, out_dim=12):
         super(Global_MessagePassing, self).__init__()
         self.dim = dim
         self.out_dim = out_dim

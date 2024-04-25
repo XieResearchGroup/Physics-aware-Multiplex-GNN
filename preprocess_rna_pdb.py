@@ -20,6 +20,7 @@ RESIDUES = {
     'U': 2,
     'C': 3,
 }
+REV_RESIDUES = {v: k for k, v in RESIDUES.items()}
 
 def load_molecule(molecule_file):
     if ".mol2" in molecule_file:
@@ -43,6 +44,8 @@ def load_with_bio(molecule_file):
     coords = []
     atoms_elements = []
     atoms_names = []
+    residues_names = []
+    c4_prime = []
     for model in structure:
         for chain in model:
             for residue in chain:
@@ -50,8 +53,10 @@ def load_with_bio(molecule_file):
                     coords.append(atom.get_coord())
                     atoms_elements.append(atom.element)
                     atoms_names.append(atom.get_name())
+                    residues_names.append(residue.get_resname())
+                    c4_prime.append(atom.get_name() == "C4'")
                     assert len(coords) == len(atoms_elements) == len(atoms_names)
-    return np.array(coords), atoms_elements, atoms_names
+    return np.array(coords), atoms_elements, atoms_names, residues_names, c4_prime
 
 def get_xyz_from_mol(mol):
     xyz = np.zeros((mol.GetNumAtoms(), 3))
@@ -80,28 +85,33 @@ def construct_graphs(data_dir, save_dir, data_name, save_name):
         rna_file = os.path.join(data_dir_full, name)
         
         try:
-            rna_coords, elements, symbols = load_with_bio(rna_file)
+            rna_coords, elements, atoms_symbols, residues_names, c4_primes = load_with_bio(rna_file)
         except ValueError:
             print("Error reading molecule", rna_file)
             continue
 
         x_indices = [i for i,x in enumerate(elements) if (x != 'H' and x != 'X')] # Remove Hydrogen, ions, etc. Keep only C, N, O, P
         elements = [elements[i] for i in x_indices]
-        symbols = [symbols[i] for i in x_indices]
+        atoms_symbols = [atoms_symbols[i] for i in x_indices]
+        residues_names = [residues_names[i] for i in x_indices]
+        c4_primes = [c4_primes[i] for i in x_indices]
         rna_pos = np.array(rna_coords[x_indices])
 
         rna_x = np.array([ATOM_TYPES[x] for x in elements]) # Convert atomic numbers to types
+        residues_x = np.array([RESIDUES[x] for x in residues_names]) # Convert residues to types
 
-        assert len(rna_x) == len(rna_pos) == len(symbols)
+        assert len(rna_x) == len(rna_pos) == len(atoms_symbols) == len(residues_x) == len(c4_primes)
 
         # Assign a unique label to each graph (RNA molecule).
         indicator = np.ones((rna_x.shape[0], 1)) * (i + 1)
         data = {}
         data['atoms'] = rna_x
         data['pos'] = rna_pos
-        data['symbols'] = symbols
+        data['symbols'] = atoms_symbols
         data['indicator'] = indicator
         data['name'] = name
+        data['residues'] = residues_x
+        data['c4_primes'] = np.array(c4_primes)
 
         with open(os.path.join(save_dir_full, name.replace(".pdb", ".pkl")), "wb") as f:
             pickle.dump(data, f)

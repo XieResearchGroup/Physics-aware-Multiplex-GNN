@@ -13,6 +13,7 @@ class Config(object):
     def __init__(self, dataset, dim, n_layer, cutoff_l, cutoff_g):
         self.dataset = dataset
         self.dim = dim
+        self.out_dim = 12
         self.n_layer = n_layer
         self.cutoff_l = cutoff_l
         self.cutoff_g = cutoff_g
@@ -41,7 +42,7 @@ class PAMNet(nn.Module):
         self.n_layer = config.n_layer
         self.cutoff_l = config.cutoff_l
         self.cutoff_g = config.cutoff_g
-        self.atom_dim = 4
+        self.atom_dim = config.out_dim - 3 # 4 atom_types + 1 c4_prime flag + 4 residue types (AGCU) - 3 coordinates
 
         # self.embeddings = nn.Embedding(4, self.dim)
         self.init_linear = MLP([3, self.dim])
@@ -64,13 +65,13 @@ class PAMNet(nn.Module):
 
         self.global_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.global_layer.append(Global_MessagePassing(self.dim+self.atom_dim+self.time_dim))
+            self.global_layer.append(Global_MessagePassing(self.dim+self.atom_dim+self.time_dim, config.out_dim))
 
         self.local_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.local_layer.append(Local_MessagePassing(self.dim+self.atom_dim+self.time_dim))
+            self.local_layer.append(Local_MessagePassing(self.dim+self.atom_dim+self.time_dim, config.out_dim))
 
-        self.out_linear = nn.Linear(14+self.time_dim, 7)
+        self.out_linear = nn.Linear(2*config.out_dim+self.time_dim, config.out_dim)
 
         self.softmax = nn.Softmax(dim=-1)
 

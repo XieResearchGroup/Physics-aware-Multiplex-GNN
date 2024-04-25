@@ -16,21 +16,22 @@ class SampleToPDB():
             mask = sample.batch == batch
             self.write_pdb(sample.x[mask], path, name[batch])
 
-    def to_xyz(self, sample, path, name):
+    def to_xyz(self, sample, path, name, post_fix:str=''):
         # Convert sample to xyz
         unique_batches = np.unique(sample.batch.cpu().numpy())
 
         for batch in unique_batches:
             mask = sample.batch == batch
-            self.write_xyz(sample.x[mask], path, name[batch])
+            self.write_xyz(sample.x[mask], path, name[batch], post_fix)
 
-    def write_xyz(self, x, path, name):
+    def write_xyz(self, x, path, name, post_fix:str=''):
         atoms_pos = x[:, :3].cpu().numpy()
         atoms_pos *= 10  # Convert back to angstroms
         atoms_types = x[:, 3:7].cpu().numpy()
         atom_names = [REV_ATOM_TYPES[np.argmax(atom)] for atom in atoms_types]
 
         name = name.replace(".pdb", "")
+        name = name + post_fix
         name = name + '.xyz' if not name.endswith('.xyz') else name
         # Save the structure as a xyz file
         os.makedirs(path, exist_ok=True)
