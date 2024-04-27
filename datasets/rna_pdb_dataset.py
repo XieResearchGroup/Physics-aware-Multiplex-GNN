@@ -3,16 +3,10 @@ import torch
 import numpy as np
 import pickle
 from torch_geometric.data import Data, Dataset
-from preprocess_rna_pdb import REV_RESIDUES
+from preprocess_rna_pdb import REV_RESIDUES, COARSE_GRAIN_MAP
 
 class RNAPDBDataset(Dataset):
     backbone_atoms = ['P', 'O5\'', 'C5\'', 'C4\'', 'C3\'', 'O3\'']
-    coarse_grain_map = {
-        'A': ["P", "C4'", "N9", "C2", "C6"],
-        'G': ["P", "C4'", "N9", "C2", "C6"],
-        "U": ["P", "C4'", "N1", "C2", "C4"],
-        "C": ["P", "C4'", "N1", "C2", "C4"],
-    }
     
     def __init__(self,
                  path: str,
@@ -54,13 +48,17 @@ class RNAPDBDataset(Dataset):
         atoms_pos -= atoms_pos_mean # Center around point (0,0,0)
         atoms_pos /= 10
         indicator = self.to_tensor(sample['indicator'])
+        c2 = c4_or_c6 = n1_or_n9 = None
         if self.mode == 'backbone':
             atoms_pos, atoms_types, c4_primes, residues = self.backbone_only(atoms_pos, atoms_types, sample)
         elif self.mode == 'coarse-grain':
-            atoms_pos, atoms_types, c4_primes, residues = self.coarse_grain(atoms_pos, atoms_types, sample)
+            atoms_pos, atoms_types, c4_primes, residues, c2, c4_or_c6, n1_or_n9 = self.coarse_grain(atoms_pos, atoms_types, sample)
         elif self.mode == 'all':
             c4_primes = sample['c4_primes']
             residues = sample['residues']
+            c2 = sample['c2']
+            c4_or_c6 = sample['c4_or_c6']
+            n1_or_n9 = sample['n1_or_n9']
 
         name = sample['name'].replace('.pkl', '')
         # convert atom_types to one-hot encoding (C, O, N, P)
@@ -68,9 +66,17 @@ class RNAPDBDataset(Dataset):
         atoms_types = atoms_types.squeeze(1)
 
         c4_primes = torch.tensor(c4_primes).float().unsqueeze(1)
+        if c2 is not None:
+            c2 = torch.tensor(c2).float().unsqueeze(1)
+            c4_or_c6 = torch.tensor(c4_or_c6).float().unsqueeze(1)
+            n1_or_n9 = torch.tensor(n1_or_n9).float().unsqueeze(1)
         residues = torch.nn.functional.one_hot(torch.tensor(residues).to(torch.int64), num_classes=4).float()
 
-        data_x = torch.cat((atoms_pos, atoms_types, c4_primes, residues), dim=1)
+        if c2 is not None:
+            data_x = torch.cat((atoms_pos, atoms_types, residues, c4_primes, c2, c4_or_c6, n1_or_n9), dim=1)
+        else:
+            data_x = torch.cat((atoms_pos, atoms_types, residues, c4_primes), dim=1)
+
         return data_x, indicator, name
 
     def backbone_only(self, atom_pos, atom_types, sample):
@@ -80,12 +86,13 @@ class RNAPDBDataset(Dataset):
         return atom_pos[mask], atom_types[mask], c4_primes[mask], residues[mask]
     
     def coarse_grain(self, atom_pos, atom_types, sample):
-        rev_residues = [REV_RESIDUES[x] for x in sample['residues']]
-        coarse_atoms = [self.coarse_grain_map[x] for x in rev_residues]
-        mask = [True if atom in coars_atoms else False for atom, coars_atoms in zip(sample['symbols'], coarse_atoms)]
+        mask = sample['crs-grain-mask']
         c4_primes = sample['c4_primes']
+        c2 = sample['c2']
+        c4_or_c6 = sample['c4_or_c6']
+        n1_or_n9 = sample['n1_or_n9']
         residues = sample['residues']
-        return atom_pos[mask], atom_types[mask], c4_primes[mask], residues[mask]
+        return atom_pos[mask], atom_types[mask], c4_primes[mask], residues[mask], c2[mask], c4_or_c6[mask], n1_or_n9[mask]
 
     @property
     def raw_file_names(self):

@@ -22,6 +22,13 @@ RESIDUES = {
 }
 REV_RESIDUES = {v: k for k, v in RESIDUES.items()}
 
+COARSE_GRAIN_MAP = {
+        'A': ["P", "C4'", "N9", "C2", "C6"],
+        'G': ["P", "C4'", "N9", "C2", "C6"],
+        "U": ["P", "C4'", "N1", "C2", "C4"],
+        "C": ["P", "C4'", "N1", "C2", "C4"],
+    }
+
 def load_molecule(molecule_file):
     if ".mol2" in molecule_file:
         my_mol = Chem.MolFromMol2File(molecule_file, sanitize=False, removeHs=True)
@@ -46,6 +53,9 @@ def load_with_bio(molecule_file):
     atoms_names = []
     residues_names = []
     c4_prime = []
+    c2 = []
+    c4_or_c6 = []
+    n1_or_n9 = []
     for model in structure:
         for chain in model:
             for residue in chain:
@@ -55,8 +65,10 @@ def load_with_bio(molecule_file):
                     atoms_names.append(atom.get_name())
                     residues_names.append(residue.get_resname())
                     c4_prime.append(atom.get_name() == "C4'")
-                    assert len(coords) == len(atoms_elements) == len(atoms_names)
-    return np.array(coords), atoms_elements, atoms_names, residues_names, c4_prime
+                    c2.append(atom.get_name() == "C2")
+                    c4_or_c6.append(atom.get_name() == "C4" or atom.get_name() == "C6")
+                    n1_or_n9.append(atom.get_name() == "N1" or atom.get_name() == "N9")
+    return np.array(coords), atoms_elements, atoms_names, residues_names, c4_prime, c2, c4_or_c6, n1_or_n9
 
 def get_xyz_from_mol(mol):
     xyz = np.zeros((mol.GetNumAtoms(), 3))
@@ -67,6 +79,11 @@ def get_xyz_from_mol(mol):
         xyz[i, 1] = position.y
         xyz[i, 2] = position.z
     return (xyz)
+
+def get_coarse_grain_mask(data, residues):
+    coarse_atoms = [COARSE_GRAIN_MAP[x] for x in residues]
+    mask = [True if atom in coars_atoms else False for atom, coars_atoms in zip(data['symbols'], coarse_atoms)]
+    return np.array(mask)
 
 def construct_graphs(data_dir, save_dir, data_name, save_name):
     print("Preprocessing", data_name)
@@ -85,7 +102,7 @@ def construct_graphs(data_dir, save_dir, data_name, save_name):
         rna_file = os.path.join(data_dir_full, name)
         
         try:
-            rna_coords, elements, atoms_symbols, residues_names, c4_primes = load_with_bio(rna_file)
+            rna_coords, elements, atoms_symbols, residues_names, c4_primes, c2, c4_or_c6, n1_or_n9 = load_with_bio(rna_file)
         except ValueError:
             print("Error reading molecule", rna_file)
             continue
@@ -95,6 +112,9 @@ def construct_graphs(data_dir, save_dir, data_name, save_name):
         atoms_symbols = [atoms_symbols[i] for i in x_indices]
         residues_names = [residues_names[i] for i in x_indices]
         c4_primes = [c4_primes[i] for i in x_indices]
+        c2 = [c2[i] for i in x_indices]
+        c4_or_c6 = [c4_or_c6[i] for i in x_indices]
+        n1_or_n9 = [n1_or_n9[i] for i in x_indices]
         rna_pos = np.array(rna_coords[x_indices])
 
         rna_x = np.array([ATOM_TYPES[x] for x in elements]) # Convert atomic numbers to types
@@ -112,6 +132,10 @@ def construct_graphs(data_dir, save_dir, data_name, save_name):
         data['name'] = name
         data['residues'] = residues_x
         data['c4_primes'] = np.array(c4_primes)
+        data['c2'] = np.array(c2)
+        data['c4_or_c6'] = np.array(c4_or_c6)
+        data['n1_or_n9'] = np.array(n1_or_n9)
+        data['crs-grain-mask'] = get_coarse_grain_mask(data, residues_names)
 
         with open(os.path.join(save_dir_full, name.replace(".pdb", ".pkl")), "wb") as f:
             pickle.dump(data, f)

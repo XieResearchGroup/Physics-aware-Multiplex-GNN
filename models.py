@@ -10,10 +10,13 @@ from layers import Global_MessagePassing, Local_MessagePassing, Local_MessagePas
     BesselBasisLayer, SphericalBasisLayer, MLP
 
 class Config(object):
-    def __init__(self, dataset, dim, n_layer, cutoff_l, cutoff_g):
+    def __init__(self, dataset, dim, n_layer, cutoff_l, cutoff_g, mode):
         self.dataset = dataset
         self.dim = dim
-        self.out_dim = 12
+        if mode == "backbone":
+            self.out_dim = 12
+        else:
+            self.out_dim = 15
         self.n_layer = n_layer
         self.cutoff_l = cutoff_l
         self.cutoff_g = cutoff_g

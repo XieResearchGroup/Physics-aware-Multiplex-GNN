@@ -63,6 +63,7 @@ def main():
     parser.add_argument('--cutoff_g', type=float, default=2.00, help='cutoff in global layer')
     parser.add_argument('--timesteps', type=int, default=500, help='timesteps')
     parser.add_argument('--wandb', action='store_true', help='Use wandb for logging')
+    parser.add_argument('--mode', type=str, default='coarse-grain', help='Mode of the dataset')
     args = parser.parse_args()
     
     if args.wandb:
@@ -76,9 +77,9 @@ def main():
 
     # Creat dataset
     path = osp.join('.', 'data', args.dataset)
-    train_dataset = RNAPDBDataset(path, name='train-raw-pkl', mode='coarse-grain').shuffle()
-    val_dataset = RNAPDBDataset(path, name='val-raw-pkl', mode='coarse-grain')
-    samp_dataset = RNAPDBDataset(path, name='val-raw-pkl', mode='coarse-grain')
+    train_dataset = RNAPDBDataset(path, name='train-raw-pkl', mode=args.mode).shuffle()
+    val_dataset = RNAPDBDataset(path, name='val-raw-pkl', mode=args.mode)
+    samp_dataset = RNAPDBDataset(path, name='val-raw-pkl', mode=args.mode)
 
     # Load dataset
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
@@ -90,7 +91,7 @@ def main():
         break
 
     sampler = Sampler(timesteps=args.timesteps)
-    config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g)
+    config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g, mode=args.mode)
 
     model = PAMNet(config).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -121,7 +122,7 @@ def main():
         
         val_loss = test(model, val_loader, device, sampler, args)
 
-        if epoch % 500 == 0:
+        if epoch % 100 == 0 and epoch >= 100:
             sample(model, samp_loader, device, sampler, epoch=epoch, num_batches=1)
 
         # print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
@@ -133,7 +134,7 @@ def main():
         # if not os.path.exists(save_folder):
         #     os.makedirs(save_folder)
 
-        if epoch %100 == 0:
+        if epoch %500 == 0 and epoch>=1000:
             torch.save(model.state_dict(), f"./save/model_{epoch}.h5")
 
         # if best_val_loss is None or val_loss < best_val_loss:
