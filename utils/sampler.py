@@ -35,7 +35,8 @@ class Sampler():
         self.timesteps = timesteps
         self.channels = channels
         # define beta schedule
-        self.betas = cosine_beta_schedule(timesteps=timesteps)
+        # self.betas = cosine_beta_schedule(timesteps=timesteps)
+        self.betas = linear_beta_schedule(timesteps=timesteps)
 
         # define alphas 
         alphas = 1. - self.betas

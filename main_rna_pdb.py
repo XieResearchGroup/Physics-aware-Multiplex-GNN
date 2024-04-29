@@ -26,13 +26,15 @@ def set_seed(seed):
 def test(model, loader, device, sampler, args):
     model.eval()
     losses = []
+    denoise_losses = []
     for data, name in loader:
         data = data.to(device)
         t = torch.randint(0, args.timesteps, (args.batch_size,), device=device).long() # Generate random timesteps
         graphs_t = t[data.batch]
-        loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
+        loss, denoise_loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
         losses.append(loss.item())
-    return np.mean(losses)
+        denoise_losses.append(denoise_loss.item())
+    return np.mean(losses), np.mean(denoise_losses)
 
 def sample(model, loader, device, sampler, epoch, num_batches=None):
     model.eval()
@@ -41,13 +43,12 @@ def sample(model, loader, device, sampler, epoch, num_batches=None):
     for data, name in loader:
         data = data.to(device)
         samples = sampler.sample(model, data)[-1]
-        s.to_xyz(samples, f"./samples/{epoch}", name)
+        s.to('xyz', samples, f"./samples/{epoch}", name)
+        s.to('trafl', samples, f"./samples/{epoch}", name)
 
         s_counter += 1
         if num_batches is not None and s_counter >= num_batches:
             break
-
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -77,7 +78,8 @@ def main():
 
     # Creat dataset
     path = osp.join('.', 'data', args.dataset)
-    train_dataset = RNAPDBDataset(path, name='train-raw-pkl', mode=args.mode).shuffle()
+    # train_dataset = RNAPDBDataset(path, name='train-raw-pkl', mode=args.mode).shuffle()
+    train_dataset = RNAPDBDataset(path, name='desc-pkl', mode=args.mode).shuffle()
     val_dataset = RNAPDBDataset(path, name='val-raw-pkl', mode=args.mode)
     samp_dataset = RNAPDBDataset(path, name='val-raw-pkl', mode=args.mode)
 
@@ -97,11 +99,12 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     
     print("Start training!")
-    best_val_loss = None
+    
     for epoch in range(args.epochs):
         model.train()
         step = 0
         losses = []
+        denoise_losses = []
         for data, name in train_loader:
             
             data = data.to(device)
@@ -110,31 +113,32 @@ def main():
             t = torch.randint(0, args.timesteps, (args.batch_size,), device=device).long() # Generate random timesteps
             graphs_t = t[data.batch]
             
-            loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
+            loss_all, loss_denoise = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
 
-            loss.backward()
+            loss_all.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0) # prevent exploding gradients
             optimizer.step()
-            losses.append(loss.item())
+            losses.append(loss_all.item())
+            denoise_losses.append(loss_denoise.item())
             if step % 100 == 0 and step != 0:
-                print(f"Step: {step}, Loss: {loss.item():.4f}")
+                print(f'Epoch: {epoch+1}, Step: {step}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}')
             step += 1
         
-        val_loss = test(model, val_loader, device, sampler, args)
+        val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
 
-        if epoch % 100 == 0 and epoch >= 100:
+        if epoch % 1 == 0:
             sample(model, samp_loader, device, sampler, epoch=epoch, num_batches=1)
 
         # print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
         if args.wandb:
-            wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss})
-        print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}, Val Loss: {val_loss:.4f}')
+            wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss,})
+        print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
         
         # save_folder = os.path.join(".", "save", args.dataset)
         # if not os.path.exists(save_folder):
         #     os.makedirs(save_folder)
 
-        if epoch %500 == 0 and epoch>=1000:
+        if epoch %1 == 0:
             torch.save(model.state_dict(), f"./save/model_{epoch}.h5")
 
         # if best_val_loss is None or val_loss < best_val_loss:

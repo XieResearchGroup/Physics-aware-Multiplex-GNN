@@ -27,8 +27,10 @@ def p_losses(denoise_model,
     elif loss_type == 'l2':
         loss = F.mse_loss(noise, predicted_noise)
     elif loss_type == "huber":
-        loss = F.smooth_l1_loss(noise, predicted_noise)
+        loss_copy = F.smooth_l1_loss(noise[:, 3:], predicted_noise[:, 3:])
+        loss_denoise = F.smooth_l1_loss(noise[:, :3], predicted_noise[:, :3])
+        loss = 0.3 * loss_copy + 0.7 * loss_denoise
     else:
         raise NotImplementedError()
 
-    return loss
+    return loss, loss_denoise
