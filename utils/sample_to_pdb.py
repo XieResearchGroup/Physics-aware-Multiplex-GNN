@@ -66,7 +66,6 @@ class SampleToPDB():
             post_fix (str, optional): Postfix added to the name of file (if any). Defaults to ''.
             rnd_dig (int, optional): Round coordinates to n decimal points. Defaults to 4.
         """
-        save_order = [4, 0, 3, 1, 2] # ['P', 'C4\'', 'N9', 'C2', 'C6']
         atoms_pos, atom_names = self.get_atoms_pos_and_types(x)
         atom_names = np.array(atom_names)
         atoms_pos = atoms_pos.reshape(-1, 5, 3)

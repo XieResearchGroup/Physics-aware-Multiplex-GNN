@@ -13,14 +13,14 @@
             "args": [
                 "--dataset",
                 "RNA-PDB",
-                "--epochs=500",
-                "--batch_size=128",
+                "--epochs=501",
+                "--batch_size=64",
                 "--dim=128",
-                "--n_layer=2",
+                "--n_layer=8",
                 "--lr=1e-3",
                 "--timesteps=500",
                 "--mode",
-                "backbone"
+                "coarse-grain"
             ]
         },
         {
@@ -31,6 +31,26 @@
             "console": "integratedTerminal",
             "args": [
             ]
+        },
+        {
+            "name": "Sample",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "sample_rna_pdb.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--dataset",
+                "RNA-PDB",
+                "--epochs=501",
+                "--batch_size=64",
+                "--dim=128",
+                "--n_layer=8",
+                "--lr=1e-3",
+                "--timesteps=500",
+                "--mode",
+                "coarse-grain"
+            ]
         }
+
     ]
 }

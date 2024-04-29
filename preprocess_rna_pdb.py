@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 from rdkit import Chem
 import pickle
+import Bio
 from Bio.PDB import PDBParser
 
 ATOM_TYPES = {
@@ -101,10 +102,17 @@ def construct_graphs(data_dir, save_dir, data_name, save_name):
         name = name_list[i]
         rna_file = os.path.join(data_dir_full, name)
         
+        # if rna_file exists, skip
+        if os.path.exists(os.path.join(save_dir_full, name.replace(".pdb", ".pkl"))):
+            continue
+        
         try:
             rna_coords, elements, atoms_symbols, residues_names, c4_primes, c2, c4_or_c6, n1_or_n9 = load_with_bio(rna_file)
         except ValueError:
             print("Error reading molecule", rna_file)
+            continue
+        except Bio.PDB.PDBExceptions.PDBConstructionException as e:
+            print("Error reading molecule (invalid or missing coordinate)", rna_file)
             continue
 
         x_indices = [i for i,x in enumerate(elements) if (x != 'H' and x != 'X')] # Remove Hydrogen, ions, etc. Keep only C, N, O, P
@@ -124,6 +132,7 @@ def construct_graphs(data_dir, save_dir, data_name, save_name):
 
         # Assign a unique label to each graph (RNA molecule).
         indicator = np.ones((rna_x.shape[0], 1)) * (i + 1)
+        
         data = {}
         data['atoms'] = rna_x
         data['pos'] = rna_pos
@@ -135,7 +144,8 @@ def construct_graphs(data_dir, save_dir, data_name, save_name):
         data['c2'] = np.array(c2)
         data['c4_or_c6'] = np.array(c4_or_c6)
         data['n1_or_n9'] = np.array(n1_or_n9)
-        data['crs-grain-mask'] = get_coarse_grain_mask(data, residues_names)
+        crs_gr_mask = get_coarse_grain_mask(data, residues_names)
+        data['crs-grain-mask'] = crs_gr_mask
 
         with open(os.path.join(save_dir_full, name.replace(".pdb", ".pkl")), "wb") as f:
             pickle.dump(data, f)
@@ -143,10 +153,11 @@ def construct_graphs(data_dir, save_dir, data_name, save_name):
 
 def main():
     # data_dir = os.path.join(".", "data", "RNA-PDB")
-    data_dir = "/data/3d/"
+    data_dir = "../input_data/diffusion-desc-pdbs/"
     save_dir = os.path.join(".", "data", "RNA-PDB")
     
-    construct_graphs(data_dir, save_dir, "bgsu-pdbs-unpack" , "train-raw-pkl")
+    # construct_graphs(data_dir, save_dir, "bgsu-pdbs-unpack" , "train-raw-pkl")
+    construct_graphs(data_dir, save_dir, "desc-pdbs" , "desc-pkl")
     # construct_graphs(data_dir, save_dir, "train-pdb" , "train-pkl")
     # construct_graphs(data_dir, save_dir, "val-pdb", "val-pkl")
 
