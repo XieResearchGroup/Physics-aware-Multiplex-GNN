@@ -29,6 +29,7 @@ class Local_MessagePassing(torch.nn.Module):
         self.W_out = nn.Linear(self.dim, self.out_dim)
         self.W = nn.Parameter(torch.Tensor(self.dim, self.out_dim))
         self.bnorm = nn.BatchNorm1d(self.out_dim)
+        self.silu_act = nn.SiLU()
 
         self.init()
 
@@ -65,6 +66,7 @@ class Local_MessagePassing(torch.nn.Module):
         att_score = out.matmul(self.W).unsqueeze(0)
         out = self.W_out(out) # .unsqueeze(0)
         out = self.bnorm(out).unsqueeze(0)
+        out = self.silu_act(out)
 
         return x, out, att_score
 
