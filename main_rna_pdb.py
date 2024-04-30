@@ -120,8 +120,9 @@ def main():
             optimizer.step()
             losses.append(loss_all.item())
             denoise_losses.append(loss_denoise.item())
-            if step % 100 == 0 and step != 0:
+            if step % 100 == 0 and step != 0 and args.wandb:
                 print(f'Epoch: {epoch+1}, Step: {step}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}')
+                wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss,})
             step += 1
         
         val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
