@@ -28,11 +28,10 @@ class RNAPDBDataset(Dataset):
         return len(self.files)
 
     def get(self, idx):
-        data_x, batch, name = self.get_raw_sample(idx)
-        if self.transform:
-            torsions = self.transform(torsions)
+        data_x, edges, name = self.get_raw_sample(idx)
         data = Data(
-            x=data_x
+            x=data_x,
+            edge_index=torch.tensor(edges).t().contiguous(),
         )
         return data, name
 
@@ -47,7 +46,6 @@ class RNAPDBDataset(Dataset):
         atoms_pos_mean = atoms_pos.mean(dim=0)
         atoms_pos -= atoms_pos_mean # Center around point (0,0,0)
         atoms_pos /= 10
-        indicator = self.to_tensor(sample['indicator'])
         c2 = c4_or_c6 = n1_or_n9 = None
         if self.mode == 'backbone':
             atoms_pos, atoms_types, c4_primes, residues = self.backbone_only(atoms_pos, atoms_types, sample)
@@ -77,7 +75,7 @@ class RNAPDBDataset(Dataset):
         else:
             data_x = torch.cat((atoms_pos, atoms_types, residues, c4_primes), dim=1)
 
-        return data_x, indicator, name
+        return data_x, sample['edges'], name
 
     def backbone_only(self, atom_pos, atom_types, sample):
         mask = [True if atom in self.backbone_atoms else False for atom in sample['symbols']]
@@ -86,13 +84,13 @@ class RNAPDBDataset(Dataset):
         return atom_pos[mask], atom_types[mask], c4_primes[mask], residues[mask]
     
     def coarse_grain(self, atom_pos, atom_types, sample):
-        mask = sample['crs-grain-mask']
+        # mask = sample['crs-grain-mask']
         c4_primes = sample['c4_primes']
         c2 = sample['c2']
         c4_or_c6 = sample['c4_or_c6']
         n1_or_n9 = sample['n1_or_n9']
         residues = sample['residues']
-        return atom_pos[mask], atom_types[mask], c4_primes[mask], residues[mask], c2[mask], c4_or_c6[mask], n1_or_n9[mask]
+        return atom_pos, atom_types, c4_primes, residues, c2, c4_or_c6, n1_or_n9
 
     @property
     def raw_file_names(self):

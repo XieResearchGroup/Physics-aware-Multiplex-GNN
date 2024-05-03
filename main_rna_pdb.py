@@ -72,8 +72,8 @@ def main():
         wandb.init(project='RNA-GNN-Diffusion', config=args)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    if torch.cuda.is_available():
-        torch.cuda.set_device(args.gpu)
+    # if torch.cuda.is_available():
+    #     torch.cuda.set_device(args.gpu)
     set_seed(args.seed)
 
     # Creat dataset
@@ -120,8 +120,9 @@ def main():
             optimizer.step()
             losses.append(loss_all.item())
             denoise_losses.append(loss_denoise.item())
-            if step % 100 == 0 and step != 0 and args.wandb:
-                print(f'Epoch: {epoch+1}, Step: {step}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}')
+            if step % 200 == 0 and step != 0 and args.wandb:
+                val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
+                print(f'Epoch: {epoch+1}, Step: {step}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
                 wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss,})
             step += 1
         

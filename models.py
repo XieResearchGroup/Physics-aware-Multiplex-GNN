@@ -130,7 +130,7 @@ class PAMNet(nn.Module):
             # x = torch.cat([x, time_emb], dim=1)
             
 
-            row, col = knn(pos, pos, 5, batch, batch) # TODO: Do we need 50 clusters? Maybe less...?
+            row, col = knn(pos, pos, 20, batch, batch)
             edge_index_knn = torch.stack([row, col], dim=0)
             edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
 
@@ -144,6 +144,9 @@ class PAMNet(nn.Module):
             tensor_l = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_l
             mask_l = dist_knn <= tensor_l
             edge_index_l = edge_index_knn[:, mask_l]
+            
+            # extend edge_index_l by data.edge_index to provide sequence context
+            edge_index_l = torch.cat((edge_index_l, data.edge_index), dim=1)
             edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
 
         else:
