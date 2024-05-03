@@ -61,7 +61,7 @@ def main():
     parser.add_argument('--n_layer', type=int, default=2, help='Number of hidden layers.')
     parser.add_argument('--dim', type=int, default=64, help='Size of input hidden units.')
     parser.add_argument('--batch_size', type=int, default=8, help='batch_size')
-    parser.add_argument('--cutoff_l', type=float, default=0.52, help='cutoff in local layer')
+    parser.add_argument('--cutoff_l', type=float, default=0.35, help='cutoff in local layer')
     parser.add_argument('--cutoff_g', type=float, default=2.00, help='cutoff in global layer')
     parser.add_argument('--timesteps', type=int, default=500, help='timesteps')
     parser.add_argument('--wandb', action='store_true', help='Use wandb for logging')
