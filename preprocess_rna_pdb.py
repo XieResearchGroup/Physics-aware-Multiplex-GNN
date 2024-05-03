@@ -162,8 +162,8 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
         rna_file = os.path.join(pdbs_dir, name)
         
         # if rna_file exists, skip
-        if os.path.exists(os.path.join(save_dir_full, name.replace(".pdb", ".pkl"))):
-            continue
+        # if os.path.exists(os.path.join(save_dir_full, name.replace(".pdb", ".pkl"))):
+        #     continue
         
         try:
             rna_coords, elements, atoms_symbols, residues_names, c4_primes, c2, c4_or_c6, n1_or_n9 = load_with_bio(rna_file)
