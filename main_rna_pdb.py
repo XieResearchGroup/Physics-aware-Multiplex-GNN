@@ -1,3 +1,4 @@
+import os
 import os.path as osp
 import argparse
 import numpy as np
@@ -36,15 +37,15 @@ def test(model, loader, device, sampler, args):
         denoise_losses.append(denoise_loss.item())
     return np.mean(losses), np.mean(denoise_losses)
 
-def sample(model, loader, device, sampler, epoch, num_batches=None):
+def sample(model, loader, device, sampler, epoch, num_batches=None, exp_name: str = "run"):
     model.eval()
     s = SampleToPDB()
     s_counter = 0
     for data, name in loader:
         data = data.to(device)
         samples = sampler.sample(model, data)[-1]
-        s.to('xyz', samples, f"./samples/{epoch}", name)
-        s.to('trafl', samples, f"./samples/{epoch}", name)
+        s.to('xyz', samples, f"./samples/{exp_name}/{epoch}", name)
+        s.to('trafl', samples, f"./samples/{exp_name}/{epoch}", name)
 
         s_counter += 1
         if num_batches is not None and s_counter >= num_batches:
@@ -69,7 +70,8 @@ def main():
     
     if args.wandb:
         wandb.login()
-        wandb.init(project='RNA-GNN-Diffusion', config=args)
+        run = wandb.init(project='RNA-GNN-Diffusion', config=args)
+        exp_name = run.name
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # if torch.cuda.is_available():
@@ -124,29 +126,31 @@ def main():
                 val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
                 print(f'Epoch: {epoch+1}, Step: {step}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
                 wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss,})
+                losses = []
+                denoise_losses = []
             step += 1
         
         val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
 
         if epoch % 1 == 0:
-            sample(model, samp_loader, device, sampler, epoch=epoch, num_batches=1)
+            sample(model, samp_loader, device, sampler, epoch=epoch, num_batches=1, exp_name=exp_name)
 
         # print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
         if args.wandb:
             wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss,})
         print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
         
-        # save_folder = os.path.join(".", "save", args.dataset)
-        # if not os.path.exists(save_folder):
-        #     os.makedirs(save_folder)
+        save_folder = f"./save/{exp_name}"
+        if not os.path.exists(save_folder):
+            os.makedirs(save_folder)
 
         if epoch %1 == 0:
-            torch.save(model.state_dict(), f"./save/model_{epoch}.h5")
+            torch.save(model.state_dict(), f"{save_folder}/model_{epoch}.h5")
 
         # if best_val_loss is None or val_loss < best_val_loss:
         #     best_val_loss = val_loss
         #     torch.save(model.state_dict(), os.path.join(save_folder, "best_model.h5"))
-    torch.save(model.state_dict(), f"./save/model_{epoch}.h5")
+    torch.save(model.state_dict(), f"{save_folder}/model_{epoch}.h5")
 
 if __name__ == "__main__":
     main()

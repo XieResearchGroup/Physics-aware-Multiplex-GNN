@@ -147,6 +147,9 @@ class PAMNet(nn.Module):
             
             # extend edge_index_l by data.edge_index to provide sequence context
             edge_index_l = torch.cat((edge_index_l, data.edge_index), dim=1)
+            #remove duplicates if any
+            edge_index_l = torch.unique(edge_index_l, dim=1)
+
             edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
 
         else:
