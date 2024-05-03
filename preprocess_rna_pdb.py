@@ -5,6 +5,7 @@ from rdkit import Chem
 import pickle
 import Bio
 from Bio.PDB import PDBParser
+# from torch_geometric.data import Data
 
 ATOM_TYPES = {
             'C': 0,   #C
@@ -29,6 +30,19 @@ COARSE_GRAIN_MAP = {
         "U": ["P", "C4'", "N1", "C2", "C4"],
         "C": ["P", "C4'", "N1", "C2", "C4"],
     }
+
+RESIDUE_CONNECTION_GRAPH = [
+    [0, 1], # P -> C4'
+    [1, 0], # C4' -> P
+    [1, 2], # C4' -> N
+    [2, 1], # N -> C4'
+    [2, 3], # N -> C2
+    [3, 2], # C2 -> N
+    [3, 4], # C2 -> C4/6
+    [4, 3], # C4/6 -> C2
+    [4, 2], # C4/6 -> N
+    [2, 4], # N -> C4/6
+]
 
 def load_molecule(molecule_file):
     if ".mol2" in molecule_file:
@@ -81,26 +95,71 @@ def get_xyz_from_mol(mol):
         xyz[i, 2] = position.z
     return (xyz)
 
-def get_coarse_grain_mask(data, residues):
+def get_coarse_grain_mask(symbols, residues):
     coarse_atoms = [COARSE_GRAIN_MAP[x] for x in residues]
-    mask = [True if atom in coars_atoms else False for atom, coars_atoms in zip(data['symbols'], coarse_atoms)]
+    mask = [True if atom in coars_atoms else False for atom, coars_atoms in zip(symbols, coarse_atoms)]
     return np.array(mask)
 
-def construct_graphs(data_dir, save_dir, data_name, save_name):
-    print("Preprocessing", data_name)
+def get_edges_in_COO(data:dict, seq_segments:list[str]):
+    # "P", "C4'", "Nx", "C2", "Cx"
+    edges = []
+    segments_lengs = [len(x) for x in seq_segments]
+    segments_lengs = np.cumsum(segments_lengs) # get the end index of each segment
 
-    data_dir_full = os.path.join(data_dir, data_name)
+    p = data['atoms'] == ATOM_TYPES['P']
+    c4_prime = data['c4_primes']
+    c2 = data['c2']
+    c4_or_c6 = data['c4_or_c6']
+    n1_or_n9 = data['n1_or_n9']
+    nodes_indecies = np.arange(data['atoms'].shape[0])
+    combined = np.stack([p, c4_prime, c2, c4_or_c6, n1_or_n9], axis=1)
+
+    added = 0
+    for index in np.concatenate([np.array([0]), segments_lengs[:-1]]):
+        if p[index*5 - added] == False:
+            combined = np.concatenate([combined[:index*5], np.array([[True, False, False, False, False]]), combined[index*5:]])
+            nodes_indecies = np.concatenate([nodes_indecies[:index*5], np.array([nodes_indecies[index*5]]), nodes_indecies[index*5:]])
+            added += 1 
+    
+    combined = combined.reshape((-1, 5, 5))
+    nodes_indecies = nodes_indecies.reshape((-1, 5))
+    comb_arg_max = np.argmax(combined, axis=2) # sometimes the order of atoms is 0,1,2,3,4, and sometimes it's different
+    for res_ni, res_arg_max in zip(nodes_indecies, comb_arg_max): # create edges in each residue
+        for i, j in RESIDUE_CONNECTION_GRAPH:
+            edge = [res_ni[res_arg_max[i]], res_ni[res_arg_max[j]]]
+            if edge[0] == edge[1]: # remove self loops, effect of adding missing P atoms
+                continue
+            edges.append(edge)
+
+    # connect residues
+    for i in range(1, len(nodes_indecies)):
+        if i in segments_lengs:
+            continue
+        prev_c4p = nodes_indecies[i-1][comb_arg_max[i-1][1]] # C4' atom index in previous residue
+        curr_p = nodes_indecies[i][comb_arg_max[i][0]] # P atom index in current residue
+        edges.append([prev_c4p, curr_p])
+        edges.append([curr_p, prev_c4p])
+    return edges
+
+def read_seq_segments(seq_file):
+    with open(seq_file, "r") as f:
+        seq = f.readline()
+    return seq.strip().split()
+
+def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
     save_dir_full = os.path.join(save_dir, save_name)
 
     if not os.path.exists(save_dir_full):
         os.makedirs(save_dir_full)
        
-    name_list = [x for x in os.listdir(data_dir_full)]
-    name_list = [x for x in name_list if ".pdb" in x]
+    name_list = [x for x in os.listdir(seq_dir)]
+    name_list = [x for x in name_list if ".seq" in x]
 
     for i in tqdm(range(len(name_list))):
         name = name_list[i]
-        rna_file = os.path.join(data_dir_full, name)
+        seq_segments = read_seq_segments(os.path.join(seq_dir, name))
+        name = name.replace(".seq", ".pdb")
+        rna_file = os.path.join(pdbs_dir, name)
         
         # if rna_file exists, skip
         if os.path.exists(os.path.join(save_dir_full, name.replace(".pdb", ".pkl"))):
@@ -131,33 +190,41 @@ def construct_graphs(data_dir, save_dir, data_name, save_name):
         assert len(rna_x) == len(rna_pos) == len(atoms_symbols) == len(residues_x) == len(c4_primes)
 
         # Assign a unique label to each graph (RNA molecule).
-        indicator = np.ones((rna_x.shape[0], 1)) * (i + 1)
-        
+        # graph_indicator = np.ones((rna_x.shape[0], 1)) * (i + 1)
+        crs_gr_mask = get_coarse_grain_mask(atoms_symbols, residues_names)
+
         data = {}
-        data['atoms'] = rna_x
-        data['pos'] = rna_pos
-        data['symbols'] = atoms_symbols
-        data['indicator'] = indicator
+        data['atoms'] = rna_x[crs_gr_mask]
+        data['pos'] = rna_pos[crs_gr_mask]
+        data['symbols'] = np.array(atoms_symbols)[crs_gr_mask]
+        # data['indicator'] = graph_indicator[crs_gr_mask]
         data['name'] = name
-        data['residues'] = residues_x
-        data['c4_primes'] = np.array(c4_primes)
-        data['c2'] = np.array(c2)
-        data['c4_or_c6'] = np.array(c4_or_c6)
-        data['n1_or_n9'] = np.array(n1_or_n9)
-        crs_gr_mask = get_coarse_grain_mask(data, residues_names)
-        data['crs-grain-mask'] = crs_gr_mask
+        data['residues'] = residues_x[crs_gr_mask]
+        data['c4_primes'] = np.array(c4_primes)[crs_gr_mask]
+        data['c2'] = np.array(c2)[crs_gr_mask]
+        data['c4_or_c6'] = np.array(c4_or_c6)[crs_gr_mask]
+        data['n1_or_n9'] = np.array(n1_or_n9)[crs_gr_mask]
+        data['edges'] = get_edges_in_COO(data, seq_segments)
+
+        # x_data = np.concatenate([data['pos'], data['atoms'].reshape(-1, 1), data['residues'].reshape(-1, 1), data['c4_primes'].reshape(-1, 1), data['c2'].reshape(-1, 1), data['c4_or_c6'].reshape(-1, 1), data['n1_or_n9'].reshape(-1, 1)], axis=1)
+        # geom_data = Data(
+        #     x=x_data,
+        #     edge_index=np.array(data['edges']).T,
+        # )
 
         with open(os.path.join(save_dir_full, name.replace(".pdb", ".pkl")), "wb") as f:
             pickle.dump(data, f)
 
 
 def main():
-    # data_dir = os.path.join(".", "data", "RNA-PDB")
-    data_dir = "../input_data/diffusion-desc-pdbs/"
+    # data_dir = "../input_data/diffusion-desc-pdbs/"
+    data_dir = "/home/mjustyna/data/"
+    seq_dir = os.path.join(data_dir, "sim_desc")
+    pdbs_dir = os.path.join(data_dir, "desc-pdbs")
     save_dir = os.path.join(".", "data", "RNA-PDB")
     
     # construct_graphs(data_dir, save_dir, "bgsu-pdbs-unpack" , "train-raw-pkl")
-    construct_graphs(data_dir, save_dir, "desc-pdbs" , "desc-pkl")
+    construct_graphs(seq_dir, pdbs_dir, save_dir, "desc-pkl")
     # construct_graphs(data_dir, save_dir, "train-pdb" , "train-pkl")
     # construct_graphs(data_dir, save_dir, "val-pdb", "val-pkl")
 
