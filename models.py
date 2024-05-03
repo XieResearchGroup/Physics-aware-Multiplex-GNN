@@ -130,7 +130,7 @@ class PAMNet(nn.Module):
             # x = torch.cat([x, time_emb], dim=1)
             
 
-            row, col = knn(pos, pos, 5, batch, batch)
+            row, col = knn(pos, pos, 30, batch, batch)
             edge_index_knn = torch.stack([row, col], dim=0)
             edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
 
