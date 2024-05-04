@@ -49,13 +49,14 @@ class PAMNet(nn.Module):
 
         # self.embeddings = nn.Embedding(4, self.dim)
         self.init_linear = MLP([3, self.dim])
+        radial_bessels = 16
 
-        self.rbf_g = BesselBasisLayer(16, self.cutoff_g, envelope_exponent)
-        self.rbf_l = BesselBasisLayer(16, self.cutoff_l, envelope_exponent)
+        self.rbf_g = BesselBasisLayer(radial_bessels, self.cutoff_g, envelope_exponent)
+        self.rbf_l = BesselBasisLayer(radial_bessels, self.cutoff_l, envelope_exponent)
         self.sbf = SphericalBasisLayer(num_spherical, num_radial, self.cutoff_l, envelope_exponent)
 
-        self.mlp_rbf_g = MLP([16, self.dim+self.atom_dim+self.time_dim])
-        self.mlp_rbf_l = MLP([16, self.dim+self.atom_dim+self.time_dim])    
+        self.mlp_rbf_g = MLP([radial_bessels, self.dim+self.atom_dim+self.time_dim])
+        self.mlp_rbf_l = MLP([radial_bessels, self.dim+self.atom_dim+self.time_dim])    
         self.mlp_sbf1 = MLP([num_spherical * num_radial, self.dim+self.atom_dim+self.time_dim])
         self.mlp_sbf2 = MLP([num_spherical * num_radial, self.dim+self.atom_dim+self.time_dim])
 
@@ -130,14 +131,21 @@ class PAMNet(nn.Module):
             # x = torch.cat([x, time_emb], dim=1)
             
 
-            row, col = knn(pos, pos, 30, batch, batch)
+            row, col = knn(pos, pos, 50, batch, batch)
             edge_index_knn = torch.stack([row, col], dim=0)
             edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
+
+            # when the distance is to high, then there are too many interactions and it's harder to train
+            # The training can be less stable - model is more prone to collapse
 
             # Compute pairwise distances in global layer
             tensor_g = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_g
             mask_g = dist_knn <= tensor_g
             edge_index_g = edge_index_knn[:, mask_g]
+
+            edge_index_g = torch.cat((edge_index_g, data.edge_index), dim=1)
+            #remove duplicate edges
+            edge_index_g = torch.unique(edge_index_g, dim=1)
             edge_index_g, dist_g = self.get_edge_info(edge_index_g, pos)
 
             # Compute pairwise distances in local layer
@@ -150,7 +158,13 @@ class PAMNet(nn.Module):
             #remove duplicate edges
             edge_index_l = torch.unique(edge_index_l, dim=1)
 
+            # TODO: Type of pairing interaction must be an edge attribute
+            # e.g. canonical, hydrogen, what atoms are involved, etc.
+
+            # TODO: Time-embedding should be a node feature
+            
             edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
+            # edge_attr_l 
 
         else:
             raise ValueError("Invalid dataset.")
