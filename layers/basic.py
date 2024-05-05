@@ -52,6 +52,7 @@ class Envelope(torch.nn.Module):
 
 
 # Basis layers are similar as those in DimeNet/DimeNet++:
+# https://github.com/pyg-team/pytorch_geometric/blob/master/torch_geometric/nn/models/dimenet.py
 # https://github.com/gasteigerjo/dimenet/tree/master/dimenet/model/layers
 
 
@@ -61,12 +62,14 @@ class BesselBasisLayer(torch.nn.Module):
         self.cutoff = cutoff
         self.envelope = Envelope(envelope_exponent)
 
-        self.freq = torch.nn.Parameter(torch.Tensor(num_radial))
+        self.freq = torch.nn.Parameter(torch.empty(num_radial))
 
         self.reset_parameters()
 
     def reset_parameters(self):
-        torch.arange(1, self.freq.numel() + 1, out=self.freq).mul_(PI)
+        with torch.no_grad():
+            torch.arange(1, self.freq.numel() + 1, out=self.freq).mul_(PI)
+        self.freq.requires_grad_()
 
     def forward(self, dist):
         dist = dist.unsqueeze(-1) / self.cutoff
