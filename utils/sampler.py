@@ -30,6 +30,22 @@ def sigmoid_beta_schedule(timesteps):
     betas = torch.linspace(-6, 6, timesteps)
     return torch.sigmoid(betas) * (beta_end - beta_start) + beta_start
 
+def generate_per_residue_noise(x_data, eps=1e-3):
+    x_start = x_data.x.contiguous()
+    atoms = x_data.x[:, -4:].sum(dim =1)
+    c_n_atoms = torch.where(atoms == 1)[0].to(x_start.device)
+    p_atoms = torch.where(atoms == 0)[0].to(x_start.device)
+    per_residue_noise = torch.rand((c_n_atoms.shape[0])//4, x_start.shape[1], device=x_start.device) # generate noise for each C4' atom
+    per_residue_noise = torch.repeat_interleave(per_residue_noise, 4, dim=0) # repeat it for all atoms in residue (except for P)
+    noise = torch.zeros_like(x_start)
+    noise[c_n_atoms] = per_residue_noise
+    diff = torch.arange(0, len(p_atoms), device=x_start.device)
+    relative_c4p = p_atoms - diff # compute the index of each C4' for every P atom
+    noise[p_atoms] = noise[c_n_atoms[relative_c4p]] # if there is a P atom, copy the noise from the corresponding C4' atom
+    noise = noise + torch.randn_like(x_start, device=x_start.device) * eps
+
+    return noise
+
 class Sampler():
     def __init__(self, timesteps: int, channels: int=3):
         self.timesteps = timesteps
@@ -90,6 +106,7 @@ class Sampler():
         coord_mask[:, 3:] = 0
         atoms_mask = 1 - coord_mask
         noise = torch.rand_like(context_mols.x, device=device)
+        # noise = generate_per_residue_noise(context_mols)
         denoised = []
         
         context_mols.x = noise * coord_mask + context_mols.x * atoms_mask

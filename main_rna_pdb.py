@@ -72,10 +72,12 @@ def main():
         wandb.login()
         run = wandb.init(project='RNA-GNN-Diffusion', config=args)
         exp_name = run.name
+    else:
+        exp_name = "test"
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # if torch.cuda.is_available():
-    #     torch.cuda.set_device(args.gpu)
+    if torch.cuda.is_available():
+        torch.cuda.set_device(args.gpu)
     set_seed(args.seed)
 
     # Creat dataset
@@ -132,13 +134,13 @@ def main():
         
         val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
 
-        if epoch % 1 == 0:
-            sample(model, samp_loader, device, sampler, epoch=epoch, num_batches=1, exp_name=exp_name)
 
-        # print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
         if args.wandb:
             wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss,})
         print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
+        
+        if epoch % 1 == 0:
+            sample(model, samp_loader, device, sampler, epoch=epoch, num_batches=1, exp_name=exp_name)
         
         save_folder = f"./save/{exp_name}"
         if not os.path.exists(save_folder):

@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from utils import Sampler
+from utils import Sampler, generate_per_residue_noise
 
 def p_losses(denoise_model,
              x_data,
@@ -12,6 +12,7 @@ def p_losses(denoise_model,
 
     x_start = x_data.x.contiguous()  # Get the position of the atoms. First 3 features are the coordinates
     if noise is None:
+        # noise = generate_per_residue_noise(x_data)
         noise = torch.randn_like(x_start)
     x_noisy = sampler.q_sample(x_start=x_start,
                                t=t,

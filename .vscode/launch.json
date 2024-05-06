@@ -13,10 +13,10 @@
             "args": [
                 "--dataset",
                 "RNA-PDB",
-                "--epochs=501",
+                "--epochs=101",
                 "--batch_size=64",
                 "--dim=128",
-                "--n_layer=8",
+                "--n_layer=2",
                 "--lr=1e-3",
                 "--timesteps=500",
                 "--mode",
