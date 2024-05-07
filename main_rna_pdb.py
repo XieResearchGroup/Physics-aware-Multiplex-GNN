@@ -61,11 +61,12 @@ def main():
     parser.add_argument('--n_layer', type=int, default=2, help='Number of hidden layers.')
     parser.add_argument('--dim', type=int, default=64, help='Size of input hidden units.')
     parser.add_argument('--batch_size', type=int, default=8, help='batch_size')
-    parser.add_argument('--cutoff_l', type=float, default=0.2, help='cutoff in local layer')
+    parser.add_argument('--cutoff_l', type=float, default=0.35, help='cutoff in local layer')
     parser.add_argument('--cutoff_g', type=float, default=0.50, help='cutoff in global layer')
     parser.add_argument('--timesteps', type=int, default=500, help='timesteps')
     parser.add_argument('--wandb', action='store_true', help='Use wandb for logging')
     parser.add_argument('--mode', type=str, default='coarse-grain', help='Mode of the dataset')
+    parser.add_argument('--knns', type=int, default=10, help='Number of knn neighbors')
     args = parser.parse_args()
     
     if args.wandb:
@@ -97,7 +98,7 @@ def main():
         break
 
     sampler = Sampler(timesteps=args.timesteps)
-    config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g, mode=args.mode)
+    config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g, mode=args.mode, knns=args.knns)
 
     model = PAMNet(config).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)

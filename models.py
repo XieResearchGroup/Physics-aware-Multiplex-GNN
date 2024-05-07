@@ -10,7 +10,7 @@ from layers import Global_MessagePassing, Local_MessagePassing, Local_MessagePas
     BesselBasisLayer, SphericalBasisLayer, MLP
 
 class Config(object):
-    def __init__(self, dataset, dim, n_layer, cutoff_l, cutoff_g, mode):
+    def __init__(self, dataset, dim, n_layer, cutoff_l, cutoff_g, mode, knns:int):
         self.dataset = dataset
         self.dim = dim
         if mode == "backbone":
@@ -20,6 +20,7 @@ class Config(object):
         self.n_layer = n_layer
         self.cutoff_l = cutoff_l
         self.cutoff_g = cutoff_g
+        self.knns = knns
 
 class SinusoidalPositionEmbeddings(nn.Module):
     def __init__(self, dim):
@@ -46,6 +47,7 @@ class PAMNet(nn.Module):
         self.cutoff_l = config.cutoff_l
         self.cutoff_g = config.cutoff_g
         self.atom_dim = config.out_dim - 3 # 4 atom_types + 1 c4_prime flag + 4 residue types (AGCU) - 3 coordinates
+        self.knns = config.knns
 
         # self.embeddings = nn.Embedding(4, self.dim)
         self.init_linear = MLP([3, self.dim])
@@ -131,7 +133,7 @@ class PAMNet(nn.Module):
             # x = torch.cat([x, time_emb], dim=1)
             
 
-            row, col = knn(pos, pos, 50, batch, batch)
+            row, col = knn(pos, pos, self.knns, batch, batch)
             edge_index_knn = torch.stack([row, col], dim=0)
             edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
 
