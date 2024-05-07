@@ -165,7 +165,7 @@ def read_seq_segments(seq_file):
 def bpseq_to_res_ids(bpseq):
     bpseq = bpseq.split("\n")
     bpseq = [x.split() for x in bpseq]
-    bpseq = [(int(x[0])-1, int(x[2])-1) for x in bpseq if int(x[2]) != 0] # -1, because the indices in bpseq are 1-based, and we need 0-based (numpy indicies)
+    bpseq = [(int(x[0])-1, int(x[2])-1) for x in bpseq if int(x[2]) != 0 and int(x[0]) < int(x[2])] # -1, because the indices in bpseq are 1-based, and we need 0-based (numpy indicies)
     return bpseq
 
 def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
