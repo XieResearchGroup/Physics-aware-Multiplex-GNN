@@ -5,6 +5,8 @@ from rdkit import Chem
 import pickle
 import Bio
 from Bio.PDB import PDBParser
+from rnapolis.annotator import extract_secondary_structure
+from rnapolis.parser import read_3d_structure
 # from torch_geometric.data import Data
 
 ATOM_TYPES = {
@@ -100,9 +102,10 @@ def get_coarse_grain_mask(symbols, residues):
     mask = [True if atom in coars_atoms else False for atom, coars_atoms in zip(symbols, coarse_atoms)]
     return np.array(mask)
 
-def get_edges_in_COO(data:dict, seq_segments:list[str]):
-    # "P", "C4'", "Nx", "C2", "Cx"
+def get_edges_in_COO(data:dict, seq_segments:list[str], bpseq: list[tuple[int, int]] = None):
+    # Order of encoded atoms: "P", "C4'", "Nx", "C2", "Cx"
     edges = []
+    edge_type = [] # True: covalent, False: other interaction
     segments_lengs = [len(x) for x in seq_segments]
     segments_lengs = np.cumsum(segments_lengs) # get the end index of each segment
 
@@ -119,7 +122,7 @@ def get_edges_in_COO(data:dict, seq_segments:list[str]):
         if p[index*5 - added] == False:
             combined = np.concatenate([combined[:index*5], np.array([[True, False, False, False, False]]), combined[index*5:]])
             nodes_indecies = np.concatenate([nodes_indecies[:index*5], np.array([nodes_indecies[index*5]]), nodes_indecies[index*5:]])
-            added += 1 
+            added += 1
     
     combined = combined.reshape((-1, 5, 5))
     nodes_indecies = nodes_indecies.reshape((-1, 5))
@@ -130,6 +133,7 @@ def get_edges_in_COO(data:dict, seq_segments:list[str]):
             if edge[0] == edge[1]: # remove self loops, effect of adding missing P atoms
                 continue
             edges.append(edge)
+            edge_type.append(True)
 
     # connect residues
     for i in range(1, len(nodes_indecies)):
@@ -139,12 +143,30 @@ def get_edges_in_COO(data:dict, seq_segments:list[str]):
         curr_p = nodes_indecies[i][comb_arg_max[i][0]] # P atom index in current residue
         edges.append([prev_c4p, curr_p])
         edges.append([curr_p, prev_c4p])
-    return edges
+        edge_type.extend([True, True])
+
+    # edges based on bpseq (2D structure)
+    if bpseq is not None:
+        for pair in bpseq:
+            for i in range(2, 5): # atoms: N, C2, Cx
+                p1 = nodes_indecies[pair[0]][comb_arg_max[pair[0]][i]] # atom i (e.g. N) connect with the corresponding atom in the paired residue
+                p2 = nodes_indecies[pair[1]][comb_arg_max[pair[1]][i]]
+                edges.append([p1, p2])
+                edges.append([p2, p1])
+                edge_type.extend([False, False])
+    assert len(edges) == len(edge_type)
+    return edges, edge_type
 
 def read_seq_segments(seq_file):
     with open(seq_file, "r") as f:
         seq = f.readline()
     return seq.strip().split()
+
+def bpseq_to_res_ids(bpseq):
+    bpseq = bpseq.split("\n")
+    bpseq = [x.split() for x in bpseq]
+    bpseq = [(int(x[0])-1, int(x[2])-1) for x in bpseq if int(x[2]) != 0] # -1, because the indices in bpseq are 1-based, and we need 0-based (numpy indicies)
+    return bpseq
 
 def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
     save_dir_full = os.path.join(save_dir, save_name)
@@ -174,6 +196,11 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
             print("Error reading molecule (invalid or missing coordinate)", rna_file)
             continue
 
+        with open(rna_file) as f:
+            structure3d = read_3d_structure(f, 1)
+            structure2d = extract_secondary_structure(structure3d, 1)
+        res_pairs = bpseq_to_res_ids(structure2d.bpseq)
+
         x_indices = [i for i,x in enumerate(elements) if (x != 'H' and x != 'X')] # Remove Hydrogen, ions, etc. Keep only C, N, O, P
         elements = [elements[i] for i in x_indices]
         atoms_symbols = [atoms_symbols[i] for i in x_indices]
@@ -189,8 +216,6 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
 
         assert len(rna_x) == len(rna_pos) == len(atoms_symbols) == len(residues_x) == len(c4_primes)
 
-        # Assign a unique label to each graph (RNA molecule).
-        # graph_indicator = np.ones((rna_x.shape[0], 1)) * (i + 1)
         crs_gr_mask = get_coarse_grain_mask(atoms_symbols, residues_names)
 
         data = {}
@@ -204,29 +229,25 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
         data['c2'] = np.array(c2)[crs_gr_mask]
         data['c4_or_c6'] = np.array(c4_or_c6)[crs_gr_mask]
         data['n1_or_n9'] = np.array(n1_or_n9)[crs_gr_mask]
-        data['edges'] = get_edges_in_COO(data, seq_segments)
-
-        # x_data = np.concatenate([data['pos'], data['atoms'].reshape(-1, 1), data['residues'].reshape(-1, 1), data['c4_primes'].reshape(-1, 1), data['c2'].reshape(-1, 1), data['c4_or_c6'].reshape(-1, 1), data['n1_or_n9'].reshape(-1, 1)], axis=1)
-        # geom_data = Data(
-        #     x=x_data,
-        #     edge_index=np.array(data['edges']).T,
-        # )
+        edges, edge_type = get_edges_in_COO(data, seq_segments, bpseq=res_pairs)
+        data['edges'] = edges
+        data['edge_type'] = edge_type
 
         with open(os.path.join(save_dir_full, name.replace(".pdb", ".pkl")), "wb") as f:
             pickle.dump(data, f)
 
 
 def main():
-    # data_dir = "../input_data/diffusion-desc-pdbs/"
+    # data_dir = "/home/mjustyna/data/test_structs/"
+    # seq_dir = os.path.join(data_dir, "seqs")
+    # pdbs_dir = os.path.join(data_dir, "pdbs")
     data_dir = "/home/mjustyna/data/"
     seq_dir = os.path.join(data_dir, "sim_desc")
     pdbs_dir = os.path.join(data_dir, "desc-pdbs")
     save_dir = os.path.join(".", "data", "RNA-PDB")
     
-    # construct_graphs(data_dir, save_dir, "bgsu-pdbs-unpack" , "train-raw-pkl")
     construct_graphs(seq_dir, pdbs_dir, save_dir, "desc-pkl")
-    # construct_graphs(data_dir, save_dir, "train-pdb" , "train-pkl")
-    # construct_graphs(data_dir, save_dir, "val-pdb", "val-pkl")
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
 
 if __name__ == "__main__":
     main()
