@@ -85,7 +85,7 @@ class SampleToPDB():
             f.write(header + "\n")
             for atom, pos, orders in zip(atom_names, atoms_pos, c4p_c2_c46_n19):
                 argmaxs = np.argmax(orders, axis=0)
-                save_order = [4, argmaxs[0], argmaxs[3], argmaxs[1], argmaxs[2]] # ['P', 'C4\'', 'N9', 'C2', 'C6']
+                save_order = [0, argmaxs[0], argmaxs[3], argmaxs[1], argmaxs[2]] # expected order is: ['P', 'C4\'', 'N9', 'C2', 'C6']
                 for atom_name, atom_pos in zip(atom[save_order], pos[save_order]):
                     f.write(f" {atom_pos[0]:.3f} {atom_pos[1]:.3f} {atom_pos[2]:.3f}")
                     c+=1
