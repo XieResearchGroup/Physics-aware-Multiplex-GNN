@@ -48,6 +48,7 @@ class PAMNet(nn.Module):
         self.cutoff_g = config.cutoff_g
         self.atom_dim = config.out_dim - 3 # 4 atom_types + 1 c4_prime flag + 4 residue types (AGCU) - 3 coordinates
         self.knns = config.knns
+        self.non_mutable_edges:dict = None
 
         # self.embeddings = nn.Embedding(4, self.dim)
         self.init_linear = MLP([3, self.dim])
@@ -57,8 +58,9 @@ class PAMNet(nn.Module):
         self.rbf_l = BesselBasisLayer(radial_bessels, self.cutoff_l, envelope_exponent)
         self.sbf = SphericalBasisLayer(num_spherical, num_radial, self.cutoff_l, envelope_exponent)
 
-        self.mlp_rbf_g = MLP([radial_bessels, self.dim+self.atom_dim+self.time_dim])
-        self.mlp_rbf_l = MLP([radial_bessels, self.dim+self.atom_dim+self.time_dim])    
+        # Add 3 to rbf to process the edge attributes with type of the edge
+        self.mlp_rbf_g = MLP([radial_bessels + 3, self.dim+self.atom_dim+self.time_dim])
+        self.mlp_rbf_l = MLP([radial_bessels + 3, self.dim+self.atom_dim+self.time_dim])
         self.mlp_sbf1 = MLP([num_spherical * num_radial, self.dim+self.atom_dim+self.time_dim])
         self.mlp_sbf2 = MLP([num_spherical * num_radial, self.dim+self.atom_dim+self.time_dim])
 
@@ -78,6 +80,7 @@ class PAMNet(nn.Module):
             self.local_layer.append(Local_MessagePassing(self.dim+self.atom_dim+self.time_dim, config.out_dim))
 
         self.out_linear = nn.Linear(2*config.out_dim+self.time_dim, config.out_dim)
+        # self.out_linear = nn.Linear(config.out_dim+self.time_dim, config.out_dim)
 
         self.softmax = nn.Softmax(dim=-1)
 
@@ -118,58 +121,64 @@ class PAMNet(nn.Module):
         idx_jj_pair = adj_t_col.storage.value()[mask_j]
 
         return idx_i, idx_j, idx_k, idx_kj, idx_ji, idx_i_pair, idx_j1_pair, idx_j2_pair, idx_jj_pair, idx_ji_pair
+    
+    def get_non_redundant_edges(self, edge_index):
+        out = []
+        for i, pair in enumerate(edge_index.t().tolist()):
+            if tuple(pair) not in self.non_mutable_edges:
+                out.append(i)
+        return edge_index[:, out]
+    
+    def merge_edge_attr(self, data, shape):
+        edge_attr = torch.zeros(shape, device=data.edge_attr.device).float()
+        edge_attr[:, 2] = 1
+        return torch.cat((edge_attr, data.edge_attr), dim=0)
 
     def forward(self, data, t=None):
         x_raw = data.x
         batch = data.batch # This parameter assigns an index to each node in the graph, indicating which graph it belongs to.
 
-        if self.dataset == "RNA-PDB":
-            x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
-            x = x_raw[:, 3:]  # one-hot encoded atom types
-            time_emb = self.time_mlp(t)
-            pos = x_raw[:,:3].contiguous()
-            x_pos = self.init_linear(pos) # coordinates embeddings
-            x = torch.cat([x_pos, x, time_emb], dim=1)
-            # x = torch.cat([x, time_emb], dim=1)
-            
+        if self.non_mutable_edges is None: # save the indices of edges given by the sequence and 2D structure
+            self.non_mutable_edges = {}
+            for i, j in data.edge_index.t().tolist():
+                self.non_mutable_edges[(i, j)] = True
 
-            row, col = knn(pos, pos, self.knns, batch, batch)
-            edge_index_knn = torch.stack([row, col], dim=0)
-            edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
+        x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
+        x = x_raw[:, 3:]  # one-hot encoded atom types
+        time_emb = self.time_mlp(t)
+        pos = x_raw[:,:3].contiguous()
+        x_pos = self.init_linear(pos) # coordinates embeddings
+        x = torch.cat([x_pos, x, time_emb], dim=1)
+        
 
-            # when the distance is to high, then there are too many interactions and it's harder to train
-            # The training can be less stable - model is more prone to collapse
+        row, col = knn(pos, pos, self.knns, batch, batch)
+        edge_index_knn = torch.stack([row, col], dim=0)
+        edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
 
-            # Compute pairwise distances in global layer
-            tensor_g = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_g
-            mask_g = dist_knn <= tensor_g
-            edge_index_g = edge_index_knn[:, mask_g]
+        # when the distance is too high, then there are too many interactions and it's harder to train
+        # The training can be less stable - model is more prone to collapse
 
-            edge_index_g = torch.cat((edge_index_g, data.edge_index), dim=1)
-            #remove duplicate edges
-            edge_index_g = torch.unique(edge_index_g, dim=1)
-            edge_index_g, dist_g = self.get_edge_info(edge_index_g, pos)
+        # Compute pairwise distances in global layer
+        tensor_g = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_g
+        mask_g = dist_knn <= tensor_g
+        edge_index_g = edge_index_knn[:, mask_g]
+        
+        edge_index_g = self.get_non_redundant_edges(edge_index_g)
+        edge_g_attr = self.merge_edge_attr(data, (edge_index_g.size(1),3))
+        edge_index_g = torch.cat((edge_index_g, data.edge_index), dim=1)
+        edge_index_g, dist_g = self.get_edge_info(edge_index_g, pos)
 
-            # Compute pairwise distances in local layer
-            tensor_l = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_l
-            mask_l = dist_knn <= tensor_l
-            edge_index_l = edge_index_knn[:, mask_l]
-            
-            # extend edge_index_l by data.edge_index to provide sequence context
-            edge_index_l = torch.cat((edge_index_l, data.edge_index), dim=1)
-            #remove duplicate edges
-            edge_index_l = torch.unique(edge_index_l, dim=1)
 
-            # TODO: Type of pairing interaction must be an edge attribute
-            # e.g. canonical, hydrogen, what atoms are involved, etc.
+        # Compute pairwise distances in local layer
+        tensor_l = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_l
+        mask_l = dist_knn <= tensor_l
+        edge_index_l = edge_index_knn[:, mask_l]
+        
+        edge_index_l = self.get_non_redundant_edges(edge_index_l)
+        edge_l_attr = self.merge_edge_attr(data, (edge_index_l.size(1),3))
+        edge_index_l = torch.cat((edge_index_l, data.edge_index), dim=1)
 
-            # TODO: Time-embedding should be a node feature
-            
-            edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
-            # edge_attr_l 
-
-        else:
-            raise ValueError("Invalid dataset.")
+        edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
         
         idx_i, idx_j, idx_k, idx_kj, idx_ji, idx_i_pair, idx_j1_pair, idx_j2_pair, idx_jj_pair, idx_ji_pair = self.indices(edge_index_l, num_nodes=x.size(0))
         
@@ -193,7 +202,10 @@ class PAMNet(nn.Module):
         rbf_g = self.rbf_g(dist_g)
         sbf1 = self.sbf(dist_l, angle1, idx_jj_pair)
         sbf2 = self.sbf(dist_l, angle2, idx_kj)
+        
 
+        rbf_l = torch.cat((rbf_l, edge_l_attr), dim=1)
+        rbf_g = torch.cat((rbf_g, edge_g_attr), dim=1)
         edge_attr_rbf_l = self.mlp_rbf_l(rbf_l)
         edge_attr_rbf_g = self.mlp_rbf_g(rbf_g)
         edge_attr_sbf1 = self.mlp_sbf1(sbf1)
@@ -217,10 +229,12 @@ class PAMNet(nn.Module):
         
         # Fusion Module
         att_score = torch.cat((torch.cat(att_score_global, 0), torch.cat(att_score_local, 0)), -1)
+        # att_score = torch.cat(att_score_local, 0)
         att_score = F.leaky_relu(att_score, 0.2)
         att_weight = self.softmax(att_score)
 
         out = torch.cat((torch.cat(out_global, 0), torch.cat(out_local, 0)), -1)
+        # out = torch.cat(out_local, 0)
         out = (out * att_weight)
         out = out.sum(dim=0)
         out = torch.cat((out, time_emb), dim=1)

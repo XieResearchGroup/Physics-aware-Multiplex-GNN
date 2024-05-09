@@ -28,10 +28,11 @@ class RNAPDBDataset(Dataset):
         return len(self.files)
 
     def get(self, idx):
-        data_x, edges, name = self.get_raw_sample(idx)
+        data_x, edges, name, edges_type = self.get_raw_sample(idx)
         data = Data(
             x=data_x,
             edge_index=torch.tensor(edges).t().contiguous(),
+            edge_attr=edges_type
         )
         return data, name
 
@@ -75,7 +76,7 @@ class RNAPDBDataset(Dataset):
         else:
             data_x = torch.cat((atoms_pos, atoms_types, residues, c4_primes), dim=1)
 
-        return data_x, sample['edges'], name
+        return data_x, sample['edges'], name, torch.nn.functional.one_hot(torch.tensor(sample['edge_type']).to(torch.int64), num_classes=3).float()
 
     def backbone_only(self, atom_pos, atom_types, sample):
         mask = [True if atom in self.backbone_atoms else False for atom in sample['symbols']]

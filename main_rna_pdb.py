@@ -66,7 +66,7 @@ def main():
     parser.add_argument('--timesteps', type=int, default=500, help='timesteps')
     parser.add_argument('--wandb', action='store_true', help='Use wandb for logging')
     parser.add_argument('--mode', type=str, default='coarse-grain', help='Mode of the dataset')
-    parser.add_argument('--knns', type=int, default=10, help='Number of knn neighbors')
+    parser.add_argument('--knns', type=int, default=2, help='Number of knn neighbors')
     args = parser.parse_args()
     
     if args.wandb:
