@@ -168,6 +168,35 @@ def bpseq_to_res_ids(bpseq):
     bpseq = [(int(x[0])-1, int(x[2])-1) for x in bpseq if int(x[2]) != 0 and int(x[0]) < int(x[2])] # -1, because the indices in bpseq are 1-based, and we need 0-based (numpy indicies)
     return bpseq
 
+def get_bpseq_pairs(rna_file, seq_path):
+    """
+    If dotbracket file in seq_path is available, then read it and parse it to bpseq.
+    Else Read 2D structure from 3D file.
+    """
+    dot_file = seq_path.replace(".seq", ".dot")
+    if os.path.exists(dot_file):
+        with open(dot_file) as f:
+            seq, dot = f.readlines()[1:] # the last line is dotbracket
+        dot = dot.strip()
+        res_pairs = dot_to_bpseq(dot)
+    else:
+        with open(rna_file) as f:
+            structure3d = read_3d_structure(f, 1)
+            structure2d = extract_secondary_structure(structure3d, 1)
+        res_pairs = bpseq_to_res_ids(structure2d.bpseq)
+    return res_pairs
+
+def dot_to_bpseq(dot):
+    stack = []
+    bpseq = []
+    for i, x in enumerate(dot):
+        if x == "(":
+            stack.append(i)
+        elif x == ")":
+            bpseq.append((stack.pop(), i))
+    return bpseq
+
+
 def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
     save_dir_full = os.path.join(save_dir, save_name)
 
@@ -179,7 +208,8 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
 
     for i in tqdm(range(len(name_list))):
         name = name_list[i]
-        seq_segments = read_seq_segments(os.path.join(seq_dir, name))
+        seq_path = os.path.join(seq_dir, name)
+        seq_segments = read_seq_segments(seq_path)
         name = name.replace(".seq", ".pdb")
         rna_file = os.path.join(pdbs_dir, name)
         
@@ -195,11 +225,10 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
         except Bio.PDB.PDBExceptions.PDBConstructionException as e:
             print("Error reading molecule (invalid or missing coordinate)", rna_file)
             continue
+        
 
-        with open(rna_file) as f:
-            structure3d = read_3d_structure(f, 1)
-            structure2d = extract_secondary_structure(structure3d, 1)
-        res_pairs = bpseq_to_res_ids(structure2d.bpseq)
+        res_pairs = get_bpseq_pairs(rna_file, seq_path=seq_path)
+        
 
         x_indices = [i for i,x in enumerate(elements) if (x != 'H' and x != 'X')] # Remove Hydrogen, ions, etc. Keep only C, N, O, P
         elements = [elements[i] for i in x_indices]
@@ -238,16 +267,18 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
 
 
 def main():
-    # data_dir = "/home/mjustyna/data/test_structs/"
-    # seq_dir = os.path.join(data_dir, "seqs")
-    # pdbs_dir = os.path.join(data_dir, "pdbs")
-    data_dir = "/home/mjustyna/data/"
-    seq_dir = os.path.join(data_dir, "sim_desc")
-    pdbs_dir = os.path.join(data_dir, "desc-pdbs")
+    data_dir = "/home/mjustyna/data/test_structs/"
+    seq_dir = os.path.join(data_dir, "seqs")
+    pdbs_dir = os.path.join(data_dir, "pdbs")
+    
+    # data_dir = "/home/mjustyna/data/"
+    # seq_dir = os.path.join(data_dir, "sim_desc")
+    # pdbs_dir = os.path.join(data_dir, "desc-pdbs")
+    
     save_dir = os.path.join(".", "data", "RNA-PDB")
     
-    construct_graphs(seq_dir, pdbs_dir, save_dir, "desc-pkl")
-    # construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "desc-pkl")
+    construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
 
 if __name__ == "__main__":
     main()

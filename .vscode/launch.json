@@ -14,13 +14,14 @@
                 "--dataset",
                 "RNA-PDB",
                 "--epochs=101",
-                "--batch_size=64",
+                "--batch_size=32",
                 "--dim=128",
                 "--n_layer=2",
                 "--lr=1e-3",
                 "--timesteps=500",
                 "--mode",
-                "coarse-grain"
+                "coarse-grain",
+                "--knn=5"
             ]
         },
         {
@@ -48,9 +49,11 @@
                 "--dim=128",
                 "--n_layer=4",
                 "--lr=1e-3",
-                "--timesteps=1000",
+                "--timesteps=4000",
                 "--mode",
-                "coarse-grain"
+                "coarse-grain",
+                "--knns",
+                "50"
             ]
         }
 
