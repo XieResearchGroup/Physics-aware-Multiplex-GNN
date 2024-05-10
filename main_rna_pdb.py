@@ -61,8 +61,8 @@ def main():
     parser.add_argument('--n_layer', type=int, default=2, help='Number of hidden layers.')
     parser.add_argument('--dim', type=int, default=64, help='Size of input hidden units.')
     parser.add_argument('--batch_size', type=int, default=8, help='batch_size')
-    parser.add_argument('--cutoff_l', type=float, default=0.35, help='cutoff in local layer')
-    parser.add_argument('--cutoff_g', type=float, default=0.50, help='cutoff in global layer')
+    parser.add_argument('--cutoff_l', type=float, default=0.5, help='cutoff in local layer')
+    parser.add_argument('--cutoff_g', type=float, default=1.60, help='cutoff in global layer')
     parser.add_argument('--timesteps', type=int, default=500, help='timesteps')
     parser.add_argument('--wandb', action='store_true', help='Use wandb for logging')
     parser.add_argument('--mode', type=str, default='coarse-grain', help='Mode of the dataset')
@@ -102,7 +102,9 @@ def main():
 
     model = PAMNet(config).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    
+    # model_path = f"save/frosty-meadow-131/model_200.h5"
+    # model.load_state_dict(torch.load(model_path))
+    # model.to(device)
     print("Start training!")
     
     for epoch in range(args.epochs):
@@ -140,7 +142,7 @@ def main():
             wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss,})
         print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
         
-        if epoch % 1 == 0:
+        if epoch % 5 == 0:
             sample(model, samp_loader, device, sampler, epoch=epoch, num_batches=1, exp_name=exp_name)
         
         save_folder = f"./save/{exp_name}"

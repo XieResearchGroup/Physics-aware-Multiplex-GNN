@@ -3,8 +3,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_sparse import SparseTensor
+from torch_geometric.data import Data
 from torch_geometric.nn import global_mean_pool, global_add_pool, radius, knn
-from torch_geometric.utils import remove_self_loops
+from torch_geometric.utils import remove_self_loops, to_networkx
 
 from layers import Global_MessagePassing, Local_MessagePassing, Local_MessagePassing_s, \
     BesselBasisLayer, SphericalBasisLayer, MLP
@@ -133,6 +134,25 @@ class PAMNet(nn.Module):
         edge_attr = torch.zeros(shape, device=data.edge_attr.device).float()
         edge_attr[:, 2] = 1
         return torch.cat((edge_attr, data.edge_attr), dim=0)
+    
+    def get_interaction_edges(self, data, dist_knn, edge_index_knn, cutoff):
+        atom_names = data.x[:, -4:]
+        atoms_argmax = torch.argmax(atom_names, dim=1)
+        out_edges = []     
+        c2_atoms = torch.where(atoms_argmax==1)[0]
+        c4_or_c6 = torch.where(atoms_argmax==2)[0]
+        n_atom = torch.where(atoms_argmax==3)[0]
+        cutoff_thr = torch.ones_like(dist_knn, device=dist_knn.device) * cutoff
+        mask = dist_knn <= cutoff_thr
+        edge_index = edge_index_knn[:, mask]
+        tmp_data = Data(edge_index=edge_index, x=atom_names)
+        tmp_graph = to_networkx(tmp_data)
+        for atoms in [c2_atoms, c4_or_c6, n_atom]: # TODO: we can create a graph of interactions between all atoms
+            sub_g = tmp_graph.subgraph(atoms.tolist())
+            out_edges.extend(list(sub_g.edges))
+        edges = torch.tensor(out_edges, device=data.edge_index.device).t()
+        edge_g_attr = self.merge_edge_attr(data, (edges.size(1),3))
+        return torch.cat((edges, data.edge_index), dim=1), edge_g_attr
 
     def forward(self, data, t=None):
         x_raw = data.x
@@ -150,34 +170,19 @@ class PAMNet(nn.Module):
         x_pos = self.init_linear(pos) # coordinates embeddings
         x = torch.cat([x_pos, x, time_emb], dim=1)
         
-
         row, col = knn(pos, pos, self.knns, batch, batch)
         edge_index_knn = torch.stack([row, col], dim=0)
         edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
 
-        # when the distance is too high, then there are too many interactions and it's harder to train
-        # The training can be less stable - model is more prone to collapse
 
-        # Compute pairwise distances in global layer
-        tensor_g = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_g
-        mask_g = dist_knn <= tensor_g
-        edge_index_g = edge_index_knn[:, mask_g]
-        
-        edge_index_g = self.get_non_redundant_edges(edge_index_g)
-        edge_g_attr = self.merge_edge_attr(data, (edge_index_g.size(1),3))
-        edge_index_g = torch.cat((edge_index_g, data.edge_index), dim=1)
+        # when the distance is too high, then there are too many interactions and it's harder to train
+        # The training can be less stable and the model is more prone to collapse
+
+        edge_index_g, edge_g_attr = self.get_interaction_edges(data, dist_knn, edge_index_knn, self.cutoff_g)
         edge_index_g, dist_g = self.get_edge_info(edge_index_g, pos)
 
 
-        # Compute pairwise distances in local layer
-        tensor_l = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_l
-        mask_l = dist_knn <= tensor_l
-        edge_index_l = edge_index_knn[:, mask_l]
-        
-        edge_index_l = self.get_non_redundant_edges(edge_index_l)
-        edge_l_attr = self.merge_edge_attr(data, (edge_index_l.size(1),3))
-        edge_index_l = torch.cat((edge_index_l, data.edge_index), dim=1)
-
+        edge_index_l, edge_l_attr = self.get_interaction_edges(data, dist_knn, edge_index_knn, self.cutoff_l)        
         edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
         
         idx_i, idx_j, idx_k, idx_kj, idx_ji, idx_i_pair, idx_j1_pair, idx_j2_pair, idx_jj_pair, idx_ji_pair = self.indices(edge_index_l, num_nodes=x.size(0))
