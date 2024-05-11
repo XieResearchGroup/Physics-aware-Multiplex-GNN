@@ -135,22 +135,27 @@ class PAMNet(nn.Module):
         edge_attr[:, 2] = 1
         return torch.cat((edge_attr, data.edge_attr), dim=0)
     
-    def get_interaction_edges(self, data, dist_knn, edge_index_knn, cutoff):
+    def get_interaction_edges(self, data, cutoff):
         atom_names = data.x[:, -4:]
         atoms_argmax = torch.argmax(atom_names, dim=1)
-        out_edges = []     
         c2_atoms = torch.where(atoms_argmax==1)[0]
         c4_or_c6 = torch.where(atoms_argmax==2)[0]
-        n_atom = torch.where(atoms_argmax==3)[0]
-        cutoff_thr = torch.ones_like(dist_knn, device=dist_knn.device) * cutoff
-        mask = dist_knn <= cutoff_thr
-        edge_index = edge_index_knn[:, mask]
-        tmp_data = Data(edge_index=edge_index, x=atom_names)
-        tmp_graph = to_networkx(tmp_data)
-        for atoms in [c2_atoms, c4_or_c6, n_atom]: # TODO: we can create a graph of interactions between all atoms
-            sub_g = tmp_graph.subgraph(atoms.tolist())
-            out_edges.extend(list(sub_g.edges))
-        edges = torch.tensor(out_edges, device=data.edge_index.device).t()
+        n_atoms = torch.where(atoms_argmax==3)[0]
+        edges = []
+
+        for atoms in [c2_atoms, c4_or_c6, n_atoms]:
+            pos = data.x[atoms, :3].contiguous()
+            batch = data.batch[atoms]
+            row, col = knn(pos, pos, self.knns, batch, batch)
+            edge_index_knn = torch.stack([row, col], dim=0)
+            edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
+            cutoff_thr = torch.ones_like(dist_knn, device=dist_knn.device) * cutoff
+            mask = dist_knn <= cutoff_thr
+            edge_index = edge_index_knn[:, mask]
+            edge_index[0, :] = atoms[edge_index[0, :]]
+            edge_index[1, :] = atoms[edge_index[1, :]]
+            edges.append(edge_index)
+        edges = torch.cat(edges, dim=1)
         edge_g_attr = self.merge_edge_attr(data, (edges.size(1),3))
         return torch.cat((edges, data.edge_index), dim=1), edge_g_attr
 
@@ -158,10 +163,9 @@ class PAMNet(nn.Module):
         x_raw = data.x
         batch = data.batch # This parameter assigns an index to each node in the graph, indicating which graph it belongs to.
 
-        if self.non_mutable_edges is None: # save the indices of edges given by the sequence and 2D structure
-            self.non_mutable_edges = {}
-            for i, j in data.edge_index.t().tolist():
-                self.non_mutable_edges[(i, j)] = True
+        # self.non_mutable_edges = {} # save the indices of edges given by the sequence and 2D structure
+        # for i, j in data.edge_index.t().tolist():
+        #     self.non_mutable_edges[(i, j)] = True
 
         x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
         x = x_raw[:, 3:]  # one-hot encoded atom types
@@ -169,20 +173,13 @@ class PAMNet(nn.Module):
         pos = x_raw[:,:3].contiguous()
         x_pos = self.init_linear(pos) # coordinates embeddings
         x = torch.cat([x_pos, x, time_emb], dim=1)
-        
-        row, col = knn(pos, pos, self.knns, batch, batch)
-        edge_index_knn = torch.stack([row, col], dim=0)
-        edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
+                
 
-
-        # when the distance is too high, then there are too many interactions and it's harder to train
-        # The training can be less stable and the model is more prone to collapse
-
-        edge_index_g, edge_g_attr = self.get_interaction_edges(data, dist_knn, edge_index_knn, self.cutoff_g)
+        edge_index_g, edge_g_attr = self.get_interaction_edges(data, self.cutoff_g)
         edge_index_g, dist_g = self.get_edge_info(edge_index_g, pos)
 
 
-        edge_index_l, edge_l_attr = self.get_interaction_edges(data, dist_knn, edge_index_knn, self.cutoff_l)        
+        edge_index_l, edge_l_attr = self.get_interaction_edges(data, self.cutoff_l)
         edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
         
         idx_i, idx_j, idx_k, idx_kj, idx_ji, idx_i_pair, idx_j1_pair, idx_j2_pair, idx_jj_pair, idx_ji_pair = self.indices(edge_index_l, num_nodes=x.size(0))
