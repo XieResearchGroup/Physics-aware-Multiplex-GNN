@@ -21,6 +21,13 @@ def p_losses(denoise_model,
     x_noisy = torch.cat((x_noisy[:,:3], x_data.x[:,3:]), dim=1)
     x_data.x = x_noisy
     predicted_noise = denoise_model(x_data, t)
+    # import cProfile
+    # with cProfile.Profile() as p:
+    #     predicted_noise = denoise_model(x_data, t)
+    #     p.print_stats()
+    # import pstats
+    # s = pstats.Stats(p)
+    # s = s.sort_stats('cumtime')
     noise[:, 3:] = x_start[:, 3:]  # masked coords
 
     if loss_type == 'l1':

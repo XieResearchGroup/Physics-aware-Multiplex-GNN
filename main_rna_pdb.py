@@ -80,6 +80,7 @@ def main():
     if torch.cuda.is_available():
         torch.cuda.set_device(args.gpu)
     set_seed(args.seed)
+    print("Device: ", device)
 
     # Creat dataset
     path = osp.join('.', 'data', args.dataset)
@@ -102,7 +103,7 @@ def main():
 
     model = PAMNet(config).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    # model_path = f"save/frosty-meadow-131/model_200.h5"
+    # model_path = f"save/iconic-forest-172/model_14.h5"
     # model.load_state_dict(torch.load(model_path))
     # model.to(device)
     print("Start training!")
