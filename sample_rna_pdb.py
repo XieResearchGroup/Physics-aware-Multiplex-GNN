@@ -28,8 +28,8 @@ def main():
     parser.add_argument('--n_layer', type=int, default=4, help='Number of hidden layers.')
     parser.add_argument('--dim', type=int, default=64, help='Size of input hidden units.')
     parser.add_argument('--batch_size', type=int, default=8, help='batch_size')
-    parser.add_argument('--cutoff_l', type=float, default=0.55, help='cutoff in local layer')
-    parser.add_argument('--cutoff_g', type=float, default=1.7, help='cutoff in global layer')
+    parser.add_argument('--cutoff_l', type=float, default=0.5, help='cutoff in local layer')
+    parser.add_argument('--cutoff_g', type=float, default=1.6, help='cutoff in global layer')
     parser.add_argument('--timesteps', type=int, default=4000, help='timesteps')
     parser.add_argument('--wandb', action='store_true', help='Use wandb for logging')
     parser.add_argument('--mode', type=str, default='coarse-grain', help='Mode of the dataset')
@@ -39,8 +39,8 @@ def main():
     print('Seed:', args.seed)
     set_seed(args.seed)
     # Load the model
-    epoch = 30
-    model_path = f"save/distinctive-dragon-163/model_{epoch}.h5"
+    epoch = 80
+    model_path = f"save/soft-snow-187/model_{epoch}.h5"
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g, mode=args.mode, knns=args.knns)
     model = PAMNet(config)
     model.load_state_dict(torch.load(model_path))

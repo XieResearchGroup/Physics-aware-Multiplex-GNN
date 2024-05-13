@@ -46,14 +46,14 @@
                 "40",
                 "--epochs=501",
                 "--batch_size=64",
-                "--dim=128",
+                "--dim=256",
                 "--n_layer=4",
                 "--lr=1e-3",
                 "--timesteps=4000",
                 "--mode",
                 "coarse-grain",
                 "--knns",
-                "50"
+                "5"
             ]
         }
 
