@@ -39,7 +39,7 @@ def main():
     print('Seed:', args.seed)
     set_seed(args.seed)
     # Load the model
-    epoch = 80
+    epoch = 287
     model_path = f"save/soft-snow-187/model_{epoch}.h5"
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g, mode=args.mode, knns=args.knns)
     model = PAMNet(config)
@@ -49,8 +49,8 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Device: ", device)
     model.to(device)
-    ds = RNAPDBDataset("data/RNA-PDB/", name='test-pkl', mode='coarse-grain')
-    ds_loader = DataLoader(ds, batch_size=4, shuffle=False)
+    ds = RNAPDBDataset("data/RNA-PDB/", name='bgsu-pkl', mode='coarse-grain')
+    ds_loader = DataLoader(ds, batch_size=6, shuffle=False)
     sampler = Sampler(timesteps=args.timesteps)
     print("Sampling...")
     sample(model, ds_loader, device, sampler, epoch, num_batches=1)

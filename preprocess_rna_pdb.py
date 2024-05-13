@@ -8,6 +8,9 @@ from Bio.PDB import PDBParser
 from rnapolis.annotator import extract_secondary_structure
 from rnapolis.parser import read_3d_structure
 # from torch_geometric.data import Data
+import warnings
+from Bio import BiopythonWarning
+warnings.simplefilter('ignore', BiopythonWarning)
 
 ATOM_TYPES = {
             'C': 0,   #C
@@ -119,7 +122,7 @@ def get_edges_in_COO(data:dict, seq_segments:list[str], bpseq: list[tuple[int, i
 
     added = 0
     for index in np.concatenate([np.array([0]), segments_lengs[:-1]]):
-        if p[index*5 - added] == False:
+        if p[index*5 - added] == False and combined.shape[0] % 5 != 0:
             combined = np.concatenate([combined[:index*5], np.array([[True, False, False, False, False]]), combined[index*5:]])
             nodes_indecies = np.concatenate([nodes_indecies[:index*5], np.array([nodes_indecies[index*5]]), nodes_indecies[index*5:]])
             added += 1
@@ -129,7 +132,7 @@ def get_edges_in_COO(data:dict, seq_segments:list[str], bpseq: list[tuple[int, i
     comb_arg_max = np.argmax(combined, axis=2) # sometimes the order of atoms is 0,1,2,3,4, and sometimes it's different
     for res_ni, res_arg_max in zip(nodes_indecies, comb_arg_max): # create edges in each residue
         for i, j in RESIDUE_CONNECTION_GRAPH:
-            edge = [res_ni[res_arg_max[i]], res_ni[res_arg_max[j]]]
+            edge = [res_ni[np.where(res_arg_max == i)[0]], res_ni[np.where(res_arg_max == j)[0]]]
             if edge[0] == edge[1]: # remove self loops, effect of adding missing P atoms
                 continue
             edges.append(edge)
@@ -139,8 +142,8 @@ def get_edges_in_COO(data:dict, seq_segments:list[str], bpseq: list[tuple[int, i
     for i in range(1, len(nodes_indecies)):
         if i in segments_lengs:
             continue
-        prev_c4p = nodes_indecies[i-1][comb_arg_max[i-1][1]] # C4' atom index in previous residue
-        curr_p = nodes_indecies[i][comb_arg_max[i][0]] # P atom index in current residue
+        prev_c4p = nodes_indecies[i-1][np.where(comb_arg_max[i-1] == 1)[0]] # C4' atom index in previous residue
+        curr_p = nodes_indecies[i][np.where(comb_arg_max[i] == 0)[0]] # P atom index in current residue
         edges.append([prev_c4p, curr_p])
         edges.append([curr_p, prev_c4p])
         edge_type.extend([True, True])
@@ -149,10 +152,10 @@ def get_edges_in_COO(data:dict, seq_segments:list[str], bpseq: list[tuple[int, i
     if bpseq is not None:
         for pair in bpseq:
             for i in range(2, 5): # atoms: N, C2, Cx
-                p1 = nodes_indecies[pair[0]][comb_arg_max[pair[0]][i]] # atom i (e.g. N) connect with the corresponding atom in the paired residue
-                p2 = nodes_indecies[pair[1]][comb_arg_max[pair[1]][i]]
-                edges.append([p1, p2])
-                edges.append([p2, p1])
+                at1 = nodes_indecies[pair[0]][np.where(comb_arg_max[pair[0]] == i)[0]] # atom i (e.g. N) connect with the corresponding atom in the paired residue
+                at2 = nodes_indecies[pair[1]][np.where(comb_arg_max[pair[1]] == i)[0]]
+                edges.append([at1, at2])
+                edges.append([at2, at1])
                 edge_type.extend([False, False])
     assert len(edges) == len(edge_type)
     return edges, edge_type
@@ -259,7 +262,7 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
         data['c4_or_c6'] = np.array(c4_or_c6)[crs_gr_mask]
         data['n1_or_n9'] = np.array(n1_or_n9)[crs_gr_mask]
         edges, edge_type = get_edges_in_COO(data, seq_segments, bpseq=res_pairs)
-        data['edges'] = edges
+        data['edges'] = np.array(edges)
         data['edge_type'] = edge_type
 
         with open(os.path.join(save_dir_full, name.replace(".pdb", ".pkl")), "wb") as f:
@@ -267,9 +270,9 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
 
 
 def main():
-    data_dir = "/home/mjustyna/data/test_structs/"
-    seq_dir = os.path.join(data_dir, "seqs")
-    pdbs_dir = os.path.join(data_dir, "pdbs")
+    data_dir = "/home/mjustyna/data/"
+    seq_dir = os.path.join(data_dir, "bgsu-seq")
+    pdbs_dir = os.path.join(data_dir, "bgsu-pdbs-unpack")
     
     # data_dir = "/home/mjustyna/data/"
     # seq_dir = os.path.join(data_dir, "sim_desc")
@@ -278,7 +281,7 @@ def main():
     save_dir = os.path.join(".", "data", "RNA-PDB")
     
     # construct_graphs(seq_dir, pdbs_dir, save_dir, "desc-pkl")
-    construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
+    construct_graphs(seq_dir, pdbs_dir, save_dir, "bgsu-pkl")
 
 if __name__ == "__main__":
     main()

@@ -70,8 +70,10 @@ class SampleToPDB():
         atom_names = np.array(atom_names)
         atoms_pos = atoms_pos.reshape(-1, 5, 3)
         atom_names = atom_names.reshape(-1, 5)
-        c4p_c2_c46_n19 = x[:, -4:].cpu().numpy()
-        c4p_c2_c46_n19 = c4p_c2_c46_n19.reshape(-1, 5, 4)
+        p_atom = x[:, -9].cpu().numpy()
+        p_c4p_c2_c46_n19 = x[:, -4:].cpu().numpy()
+        p_c4p_c2_c46_n19 = np.concatenate([p_atom.reshape(-1, 1), p_c4p_c2_c46_n19], axis=1)
+        p_c4p_c2_c46_n19 = p_c4p_c2_c46_n19.reshape(-1, 5, 5)
 
         name = name.replace(".pdb", "")
         name = name + post_fix
@@ -83,9 +85,15 @@ class SampleToPDB():
         with open(out_path, 'w') as f:
             header = f"1 1 0 0 0"
             f.write(header + "\n")
-            for atom, pos, orders in zip(atom_names, atoms_pos, c4p_c2_c46_n19):
-                argmaxs = np.argmax(orders, axis=0)
-                save_order = [0, argmaxs[0], argmaxs[3], argmaxs[1], argmaxs[2]] # expected order is: ['P', 'C4\'', 'N9', 'C2', 'C6']
+            for atom, pos, orders in zip(atom_names, atoms_pos, p_c4p_c2_c46_n19):
+                argmaxs = np.argmax(orders, axis=1)
+                save_order = np.array([
+                    np.where(argmaxs == 0)[0], # P
+                    np.where(argmaxs == 1)[0], # C4'
+                    np.where(argmaxs == 4)[0], # N1 or N9
+                    np.where(argmaxs == 2)[0], # C2
+                    np.where(argmaxs == 3)[0] # C4 or C6
+                ]).flatten()
                 for atom_name, atom_pos in zip(atom[save_order], pos[save_order]):
                     f.write(f" {atom_pos[0]:.3f} {atom_pos[1]:.3f} {atom_pos[2]:.3f}")
                     c+=1
