@@ -141,23 +141,22 @@ class PAMNet(nn.Module):
         c2_atoms = torch.where(atoms_argmax==1)[0]
         c4_or_c6 = torch.where(atoms_argmax==2)[0]
         n_atoms = torch.where(atoms_argmax==3)[0]
-        edges = []
+        
+        base_atoms = torch.cat((c2_atoms, c4_or_c6, n_atoms), dim=0)
 
-        for atoms in [c2_atoms, c4_or_c6, n_atoms]:
-            pos = data.x[atoms, :3].contiguous()
-            batch = data.batch[atoms]
-            row, col = knn(pos, pos, self.knns, batch, batch)
-            edge_index_knn = torch.stack([row, col], dim=0)
-            edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
-            cutoff_thr = torch.ones_like(dist_knn, device=dist_knn.device) * cutoff
-            mask = dist_knn <= cutoff_thr
-            edge_index = edge_index_knn[:, mask]
-            edge_index[0, :] = atoms[edge_index[0, :]]
-            edge_index[1, :] = atoms[edge_index[1, :]]
-            edges.append(edge_index)
-        edges = torch.cat(edges, dim=1)
-        edge_g_attr = self.merge_edge_attr(data, (edges.size(1),3))
-        return torch.cat((edges, data.edge_index), dim=1), edge_g_attr
+        pos = data.x[base_atoms, :3].contiguous()
+        batch = data.batch[base_atoms]
+        row, col = knn(pos, pos, self.knns, batch, batch)
+        edge_index_knn = torch.stack([row, col], dim=0)
+        edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
+        cutoff_thr = torch.ones_like(dist_knn, device=dist_knn.device) * cutoff
+        mask = dist_knn <= cutoff_thr
+        edges = edge_index_knn[:, mask]
+        edges[0, :] = base_atoms[edges[0, :]]
+        edges[1, :] = base_atoms[edges[1, :]]
+        
+        edge_attr = self.merge_edge_attr(data, (edges.size(1),3))
+        return torch.cat((edges, data.edge_index), dim=1), edge_attr
 
     def forward(self, data, t=None):
         x_raw = data.x

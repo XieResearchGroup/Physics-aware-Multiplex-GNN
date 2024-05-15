@@ -103,8 +103,8 @@ def main():
 
     model = PAMNet(config).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    model_path = f"save/divine-shadow-186/model_305.h5"
-    model.load_state_dict(torch.load(model_path))
+    # model_path = f"save/divine-shadow-186/model_305.h5"
+    # model.load_state_dict(torch.load(model_path))
     model.to(device)
     print("Start training!")
     

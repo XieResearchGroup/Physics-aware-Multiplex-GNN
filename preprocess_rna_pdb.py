@@ -130,8 +130,7 @@ def get_edges_in_COO(data:dict, seq_segments:list[str], p_missing:list[bool], bp
     for index in np.concatenate([np.array([0]), segments_lengs[:-1]]):
         if p_missing[index]: # the missing P can occur only in the first residue of the segment
             combined = np.concatenate([combined[:index*5], np.array([[True, False, False, False, False]]), combined[index*5:]])
-            nodes_indecies[(index*5):] += 1
-            nodes_indecies = np.concatenate([nodes_indecies[:index*5], np.array([nodes_indecies[index*5]-1]), nodes_indecies[index*5:]]) # add "fake" P atom and increase indices of the rest by 1.
+            nodes_indecies = np.concatenate([nodes_indecies[:index*5], np.array([nodes_indecies[index*5]]), nodes_indecies[index*5:]]) # add "fake" P atom, with the same node index (that will be filtered out later).
             added += 1
     
     combined = combined.reshape((-1, 5, 5))
