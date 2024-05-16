@@ -276,23 +276,23 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
 
 
 def main():
-    # data_dir = "/home/mjustyna/data/"
-    # seq_dir = os.path.join(data_dir, "bgsu-seq")
-    # pdbs_dir = os.path.join(data_dir, "bgsu-pdbs-unpack")
+    data_dir = "/home/mjustyna/data/"
+    seq_dir = os.path.join(data_dir, "bgsu-seq")
+    pdbs_dir = os.path.join(data_dir, "bgsu-pdbs-unpack")
 
     # data_dir = "/home/mjustyna/data/test_structs/"
     # seq_dir = os.path.join(data_dir, "seqs")
     # pdbs_dir = os.path.join(data_dir, "pdbs")
     
-    data_dir = "/home/mjustyna/data/"
-    seq_dir = os.path.join(data_dir, "sim_desc")
-    pdbs_dir = os.path.join(data_dir, "desc-pdbs")
+    # data_dir = "/home/mjustyna/data/"
+    # seq_dir = os.path.join(data_dir, "sim_desc")
+    # pdbs_dir = os.path.join(data_dir, "desc-pdbs")
     
     save_dir = os.path.join(".", "data", "RNA-PDB")
     
-    # construct_graphs(seq_dir, pdbs_dir, save_dir, "bgsu-pkl")
+    construct_graphs(seq_dir, pdbs_dir, save_dir, "bgsu-pkl")
     # construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
-    construct_graphs(seq_dir, pdbs_dir, save_dir, "desc-pkl")
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "desc-pkl")
     
 
 if __name__ == "__main__":

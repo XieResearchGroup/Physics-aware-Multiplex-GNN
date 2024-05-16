@@ -65,9 +65,13 @@ class SampleToPDB():
             name (_type_): Name of the output file
             post_fix (str, optional): Postfix added to the name of file (if any). Defaults to ''.
             rnd_dig (int, optional): Round coordinates to n decimal points. Defaults to 4.
+        Raises:
+            ValueError: If the number of atoms is not divisible by 5. The number of atoms should be a multiple of 5. Cannot save to trafl with missing P atom.
         """
         atoms_pos, atom_names = self.get_atoms_pos_and_types(x)
         atom_names = np.array(atom_names)
+        if len(atoms_pos) % 5 != 0:
+            raise ValueError("The number of atoms is not divisible by 5. The number of atoms should be a multiple of 5. Cannot save to trafl with missing P atom.")
         atoms_pos = atoms_pos.reshape(-1, 5, 3)
         atom_names = atom_names.reshape(-1, 5)
         p_atom = x[:, -9].cpu().numpy()

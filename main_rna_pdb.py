@@ -45,9 +45,12 @@ def sample(model, loader, device, sampler, epoch, num_batches=None, exp_name: st
         data = data.to(device)
         samples = sampler.sample(model, data)[-1]
         s.to('xyz', samples, f"./samples/{exp_name}/{epoch}", name)
-        s.to('trafl', samples, f"./samples/{exp_name}/{epoch}", name)
+        try:
+            s.to('trafl', samples, f"./samples/{exp_name}/{epoch}", name)
+            s_counter += 1
+        except ValueError:
+            print("Cannot save molecules with missing P atom.")
 
-        s_counter += 1
         if num_batches is not None and s_counter >= num_batches:
             break
 
@@ -128,6 +131,7 @@ def main():
             optimizer.step()
             losses.append(loss_all.item())
             denoise_losses.append(loss_denoise.item())
+            # print(f"Epoch: {epoch}, step: {step}, loss: {loss_all.item():.4f} ")
             if step % 200 == 0 and step != 0 and args.wandb:
                 val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
                 print(f'Epoch: {epoch+1}, Step: {step}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')

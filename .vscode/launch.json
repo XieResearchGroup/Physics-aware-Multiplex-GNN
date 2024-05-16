@@ -55,6 +55,13 @@
                 "--knns",
                 "5"
             ]
+        },
+        {
+            "name": "BGSU",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "tools/extract_bgsu_seq.py",
+            "console": "integratedTerminal",
         }
 
     ]

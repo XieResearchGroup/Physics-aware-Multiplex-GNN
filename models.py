@@ -167,7 +167,8 @@ class PAMNet(nn.Module):
         return edge_indeces, edge_attr
 
     def sequence_local_attention(self, x, batch, atoms_chunks1:int = 32, atoms_chunks2:int = 32):
-        out = []
+        out = [] # Optimization: extend x to size divisible by atoms_chunks2, apply x.view(-1, atoms_chunks2, self.dim) and then reshape back
+        
         for i in range(batch.max().item()+1): # iterate over batches to prevent computing attention between atoms in different graphs
             atoms = x[batch==i]
             # iterate over diagonal blocks of the matrix and compute attention between atoms in the same graph

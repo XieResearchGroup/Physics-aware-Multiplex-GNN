@@ -14,6 +14,7 @@ def main():
             s3d = read_3d_structure(f, 1)
             ss = extract_secondary_structure(s3d)
         dot = ss.dotBracket.split('\n')
+        assert "()" in dot[-1], f"Expected to find '()' in {dot[-1]}"
         segment_split = dot[-1].find("()")+1
         segment1 = dot[1][:segment_split]
         segment2 = dot[1][segment_split:]
