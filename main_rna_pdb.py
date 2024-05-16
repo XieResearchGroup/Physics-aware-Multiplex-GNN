@@ -94,7 +94,7 @@ def main():
 
     # Load dataset
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False)
     samp_loader = DataLoader(samp_dataset, batch_size=6, shuffle=False)
     print("Data loaded!")
     for data, name in train_loader:
@@ -127,17 +127,20 @@ def main():
             loss_all, loss_denoise = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
 
             loss_all.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0) # prevent exploding gradients
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0) # prevent exploding gradients
             optimizer.step()
             losses.append(loss_all.item())
             denoise_losses.append(loss_denoise.item())
-            # print(f"Epoch: {epoch}, step: {step}, loss: {loss_all.item():.4f} ")
             if step % 200 == 0 and step != 0 and args.wandb:
                 val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
                 print(f'Epoch: {epoch+1}, Step: {step}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
                 wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss,})
                 losses = []
                 denoise_losses = []
+            elif not args.wandb:
+                print(f"Epoch: {epoch}, step: {step}, loss: {loss_all.item():.4f} ")
+                # val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
+                # print(f'Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
             step += 1
         
         val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
