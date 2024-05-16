@@ -194,7 +194,7 @@ class PAMNet(nn.Module):
         x_pos = self.init_linear(pos) # coordinates embeddings
         x_prop = self.atom_properties(x) # atom properties embeddings
         x = torch.cat([x_pos, x_prop, time_emb], dim=1)
-        x = x + self.sequence_local_attention(x, batch)        
+        x = self.sequence_local_attention(x, batch, atoms_chunks2=128)        
         
 
         edge_index_g, edge_g_attr = self.get_interaction_edges(data, self.cutoff_g)
