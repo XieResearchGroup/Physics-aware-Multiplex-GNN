@@ -53,10 +53,10 @@ class PAMNet(nn.Module):
         
         assert self.dim % 2 == 0, "The dimension of the embeddings must be even."
 
-        self.init_linear = MLP([3, self.dim // 2]) # nn.Linear(3, self.dim//2, bias=False) #
-        self.atom_properties = MLP([self.atom_dim, self.dim//2])
+        self.init_linear = nn.Linear(3, self.dim//2, bias=False) #
+        self.atom_properties = nn.Linear(self.atom_dim, self.dim//2, bias=False)
         radial_bessels = 16
-        self.attn = nn.MultiheadAttention(self.dim + self.time_dim, num_heads=4, )
+        # self.attn = nn.MultiheadAttention(self.dim + self.time_dim, num_heads=4, )
 
         self.rbf_g = BesselBasisLayer(radial_bessels, self.cutoff_g, envelope_exponent)
         self.rbf_l = BesselBasisLayer(radial_bessels, self.cutoff_l, envelope_exponent)
@@ -194,7 +194,7 @@ class PAMNet(nn.Module):
         x_pos = self.init_linear(pos) # coordinates embeddings
         x_prop = self.atom_properties(x) # atom properties embeddings
         x = torch.cat([x_pos, x_prop, time_emb], dim=1)
-        x = x + self.sequence_local_attention(x, batch, atoms_chunks2=128)
+        # x = x + self.sequence_local_attention(x, batch, atoms_chunks2=128)
         
 
         edge_index_g, edge_g_attr = self.get_interaction_edges(data, self.cutoff_g)

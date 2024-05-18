@@ -6,6 +6,10 @@ import random
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DistributedSampler
 from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
 import wandb
@@ -23,18 +27,22 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+def cleanup():
+    dist.destroy_process_group()
 
-def test(model, loader, device, sampler, args):
+def validation(model, loader, device, sampler, args):
     model.eval()
     losses = []
     denoise_losses = []
-    for data, name in loader:
-        data = data.to(device)
-        t = torch.randint(0, args.timesteps, (args.batch_size,), device=device).long() # Generate random timesteps
-        graphs_t = t[data.batch]
-        loss, denoise_loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
-        losses.append(loss.item())
-        denoise_losses.append(denoise_loss.item())
+    with torch.no_grad():
+        for data, name in loader:
+            data = data.to(device)
+            t = torch.randint(0, args.timesteps, (args.batch_size,), device=device).long() # Generate random timesteps
+            graphs_t = t[data.batch]
+            loss, denoise_loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
+            losses.append(loss.item())
+            denoise_losses.append(denoise_loss.item())
+    model.train()
     return np.mean(losses), np.mean(denoise_losses)
 
 def sample(model, loader, device, sampler, epoch, num_batches=None, exp_name: str = "run"):
@@ -54,7 +62,12 @@ def sample(model, loader, device, sampler, epoch, num_batches=None, exp_name: st
         if num_batches is not None and s_counter >= num_batches:
             break
 
-def main():
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+
+def main(world_size):
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', type=int, default=0, help='GPU number.')
     parser.add_argument('--seed', type=int, default=40, help='Random seed.')
@@ -72,29 +85,33 @@ def main():
     parser.add_argument('--knns', type=int, default=2, help='Number of knn neighbors')
     args = parser.parse_args()
     
-    if args.wandb:
+    # setup(rank, world_size)
+    dist.init_process_group("nccl")
+    rank = int(os.environ['LOCAL_RANK'])
+
+    if args.wandb and rank == 0:
         wandb.login()
         run = wandb.init(project='RNA-GNN-Diffusion', config=args)
         exp_name = run.name
     else:
         exp_name = "test"
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    if torch.cuda.is_available():
-        torch.cuda.set_device(args.gpu)
+    device = rank
     set_seed(args.seed)
-    print("Device: ", device)
+    print(f"Rank: {rank} Device:{device}")
 
     # Creat dataset
     path = osp.join('.', 'data', args.dataset)
-    # train_dataset = RNAPDBDataset(path, name='train-raw-pkl', mode=args.mode).shuffle()
+    # train_dataset = RNAPDBDataset(path, name='desc-pkl', mode=args.mode).shuffle()
     train_dataset = RNAPDBDataset(path, name='desc-pkl', mode=args.mode).shuffle()
     val_dataset = RNAPDBDataset(path, name='val-raw-pkl', mode=args.mode)
     samp_dataset = RNAPDBDataset(path, name='val-raw-pkl', mode=args.mode)
 
+    dist_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank, shuffle=True)
+    val_dist_sampler = DistributedSampler(val_dataset, num_replicas=world_size, rank=rank, shuffle=False)
     # Load dataset
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, sampler=dist_sampler)
+    val_loader = DataLoader(val_dataset, batch_size=16, sampler=val_dist_sampler)
     samp_loader = DataLoader(samp_dataset, batch_size=6, shuffle=False)
     print("Data loaded!")
     for data, name in train_loader:
@@ -105,12 +122,14 @@ def main():
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g, mode=args.mode, knns=args.knns)
 
     model = PAMNet(config).to(device)
+    model = DDP(model, device_ids=[rank])
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     # model_path = f"save/divine-shadow-186/model_305.h5"
     # model.load_state_dict(torch.load(model_path))
-    model.to(device)
+    # model.to(device)
     print("Start training!")
     
+    dist.barrier()
     for epoch in range(args.epochs):
         model.train()
         step = 0
@@ -127,43 +146,65 @@ def main():
             loss_all, loss_denoise = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
 
             loss_all.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0) # prevent exploding gradients
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0) # prevent exploding gradients
             optimizer.step()
             losses.append(loss_all.item())
             denoise_losses.append(loss_denoise.item())
-            if step % 200 == 0 and step != 0 and args.wandb:
-                val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
-                print(f'Epoch: {epoch+1}, Step: {step}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
-                wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss,})
+            if step % 25 == 0 and step != 0:
+                val_loss, val_denoise_loss = validation(model, val_loader, device, sampler, args)
+                if args.wandb and rank == 0:
+                    print(f'Epoch: {epoch+1}, Step: {step}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
+                    wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss,})
                 losses = []
                 denoise_losses = []
-            elif not args.wandb:
+            elif not args.wandb and rank == 0:
                 print(f"Epoch: {epoch}, step: {step}, loss: {loss_all.item():.4f} ")
                 # val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
                 # print(f'Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
             step += 1
         
-        val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
+        # val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
 
 
-        if args.wandb:
+        if args.wandb and rank == 0:
             wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss,})
-        print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
+        if rank == 0:
+            print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
         
-        if epoch % 5 == 0:
-            sample(model, samp_loader, device, sampler, epoch=epoch, num_batches=1, exp_name=exp_name)
+        # if rank ==0:
+        #     sample(model, samp_loader, device, sampler, epoch=epoch, num_batches=1, exp_name=exp_name)
+
+        # if epoch % 5 == 0 and rank == 0:
+        #     sample(model, samp_loader, device, sampler, epoch=epoch, num_batches=1, exp_name=exp_name)
         
         save_folder = f"./save/{exp_name}"
-        if not os.path.exists(save_folder):
+        if not os.path.exists(save_folder) and rank==0:
             os.makedirs(save_folder)
 
-        if epoch %1 == 0:
-            torch.save(model.state_dict(), f"{save_folder}/model_{epoch}.h5")
+        if epoch %1 == 0 and rank==0:
+            print(f"Saving model at epoch {epoch} to {save_folder}")
+            torch.save(model.module.state_dict(), f"{save_folder}/model_{epoch}.h5")
 
         # if best_val_loss is None or val_loss < best_val_loss:
         #     best_val_loss = val_loss
         #     torch.save(model.state_dict(), os.path.join(save_folder, "best_model.h5"))
-    torch.save(model.state_dict(), f"{save_folder}/model_{epoch}.h5")
+    if rank == 0:
+        torch.save(model.module.state_dict(), f"{save_folder}/model_{epoch}.h5")
+    
+    dist.destroy_process_group()
+
+
+def run(main_fn, world_size):
+    print("Running DDP with world size: ", world_size)
+    mp.spawn(main_fn,
+             args=(world_size, ),
+             nprocs=world_size,
+             join=True)
 
 if __name__ == "__main__":
-    main()
+    n_gpus = torch.cuda.device_count()
+    print(f"Number of GPUs: {n_gpus}")
+    assert n_gpus >= 2, f"Requires at least 2 GPUs to run, but got {n_gpus}"
+    world_size = n_gpus
+    # run(main, world_size)
+    main(world_size=world_size)
