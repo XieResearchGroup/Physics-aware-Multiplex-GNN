@@ -124,7 +124,7 @@ def get_edges_in_COO(data:dict, seq_segments:list[str], p_missing:list[bool], bp
     c4_or_c6 = data['c4_or_c6']
     n1_or_n9 = data['n1_or_n9']
     nodes_indecies = np.arange(data['atoms'].shape[0])
-    combined = np.stack([p, c4_prime, c2, c4_or_c6, n1_or_n9], axis=1)
+    combined = np.stack([p, c4_prime, n1_or_n9, c2, c4_or_c6], axis=1)
 
     added = 0
     for index in np.concatenate([np.array([0]), segments_lengs[:-1]]):
@@ -276,23 +276,23 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
 
 
 def main():
-    data_dir = "/home/mjustyna/data/"
-    seq_dir = os.path.join(data_dir, "bgsu-seq")
-    pdbs_dir = os.path.join(data_dir, "bgsu-pdbs-unpack")
+    # data_dir = "/home/mjustyna/data/"
+    # seq_dir = os.path.join(data_dir, "bgsu-seq")
+    # pdbs_dir = os.path.join(data_dir, "bgsu-pdbs-unpack")
 
     # data_dir = "/home/mjustyna/data/test_structs/"
     # seq_dir = os.path.join(data_dir, "seqs")
     # pdbs_dir = os.path.join(data_dir, "pdbs")
     
-    # data_dir = "/home/mjustyna/data/"
-    # seq_dir = os.path.join(data_dir, "sim_desc")
-    # pdbs_dir = os.path.join(data_dir, "desc-pdbs")
+    data_dir = "/home/mjustyna/data/"
+    seq_dir = os.path.join(data_dir, "sim_desc")
+    pdbs_dir = os.path.join(data_dir, "desc-pdbs")
     
     save_dir = os.path.join(".", "data", "RNA-PDB")
     
-    construct_graphs(seq_dir, pdbs_dir, save_dir, "bgsu-pkl")
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "bgsu-pkl")
     # construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
-    # construct_graphs(seq_dir, pdbs_dir, save_dir, "desc-pkl")
+    construct_graphs(seq_dir, pdbs_dir, save_dir, "desc-pkl-v2")
     
 
 if __name__ == "__main__":

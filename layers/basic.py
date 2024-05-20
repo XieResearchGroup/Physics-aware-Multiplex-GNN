@@ -18,8 +18,7 @@ class SiLU(nn.Module):
 
 def MLP(channels):
     return Sequential(*[
-        # Sequential(Linear(channels[i - 1], channels[i]), BatchNorm1d(channels[i]), SiLU())
-        Sequential(Linear(channels[i - 1], channels[i]), BatchNorm1d(channels[i]))
+        Sequential(Linear(channels[i - 1], channels[i]), BatchNorm1d(channels[i]), SiLU())
         for i in range(1, len(channels))])
 
 

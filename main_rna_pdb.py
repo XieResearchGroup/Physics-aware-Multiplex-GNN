@@ -103,9 +103,9 @@ def main(world_size):
     # Creat dataset
     path = osp.join('.', 'data', args.dataset)
     # train_dataset = RNAPDBDataset(path, name='desc-pkl', mode=args.mode).shuffle()
-    train_dataset = RNAPDBDataset(path, name='desc-pkl', mode=args.mode).shuffle()
-    val_dataset = RNAPDBDataset(path, name='val-raw-pkl', mode=args.mode)
-    samp_dataset = RNAPDBDataset(path, name='val-raw-pkl', mode=args.mode)
+    train_dataset = RNAPDBDataset(path, name='desc-pkl-v2', mode=args.mode).shuffle()
+    val_dataset = RNAPDBDataset(path, name='val-raw-pkl-v2', mode=args.mode)
+    samp_dataset = RNAPDBDataset(path, name='val-raw-pkl-v2', mode=args.mode)
 
     dist_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank, shuffle=True)
     val_dist_sampler = DistributedSampler(val_dataset, num_replicas=world_size, rank=rank, shuffle=False)

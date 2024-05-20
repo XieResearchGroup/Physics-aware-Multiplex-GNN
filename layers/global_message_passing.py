@@ -27,7 +27,7 @@ class Global_MessagePassing(MessagePassing):
         self.W = nn.Parameter(torch.Tensor(self.dim, self.out_dim))
         self.bnorm = nn.BatchNorm1d(self.out_dim)
         self.aggr_bnorm = nn.BatchNorm1d(self.dim)
-        # self.silu_act = nn.SiLU()
+        self.silu_act = nn.SiLU()
 
         self.init()
 
@@ -59,8 +59,7 @@ class Global_MessagePassing(MessagePassing):
         m = torch.cat((x_i, x_j, edge_attr), -1)
         m = self.mlp_m(m)
 
-        # return self.silu_act(m * self.W_edge_attr(edge_attr))
-        return m * self.W_edge_attr(edge_attr)
+        return self.silu_act(m * self.W_edge_attr(edge_attr))
 
     def update(self, aggr_out):
         aggr_out = self.aggr_bnorm(aggr_out)
