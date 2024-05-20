@@ -150,7 +150,7 @@ def main(world_size):
             optimizer.step()
             losses.append(loss_all.item())
             denoise_losses.append(loss_denoise.item())
-            if step % 25 == 0 and step != 0:
+            if step % 50 == 0 and step != 0:
                 val_loss, val_denoise_loss = validation(model, val_loader, device, sampler, args)
                 if args.wandb and rank == 0:
                     print(f'Epoch: {epoch+1}, Step: {step}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')

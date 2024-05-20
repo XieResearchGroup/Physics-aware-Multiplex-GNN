@@ -50,23 +50,20 @@ class PAMNet(nn.Module):
         self.atom_dim = config.out_dim - 3 # 4 atom_types + 1 c4_prime flag + 4 residue types (AGCU) - 3 coordinates
         self.knns = config.knns
         self.non_mutable_edges:dict = None
-        
-        assert self.dim % 2 == 0, "The dimension of the embeddings must be even."
 
-        self.init_linear = nn.Linear(3, self.dim//2, bias=False) #
-        self.atom_properties = nn.Linear(self.atom_dim, self.dim//2, bias=False)
+        # self.embeddings = nn.Embedding(4, self.dim)
+        self.init_linear = MLP([3, self.dim])
         radial_bessels = 16
-        # self.attn = nn.MultiheadAttention(self.dim + self.time_dim, num_heads=4, )
 
         self.rbf_g = BesselBasisLayer(radial_bessels, self.cutoff_g, envelope_exponent)
         self.rbf_l = BesselBasisLayer(radial_bessels, self.cutoff_l, envelope_exponent)
         self.sbf = SphericalBasisLayer(num_spherical, num_radial, self.cutoff_l, envelope_exponent)
 
         # Add 3 to rbf to process the edge attributes with type of the edge
-        self.mlp_rbf_g = MLP([radial_bessels + 3, self.dim+self.time_dim])
-        self.mlp_rbf_l = MLP([radial_bessels + 3, self.dim+self.time_dim])
-        self.mlp_sbf1 = MLP([num_spherical * num_radial, self.dim+self.time_dim])
-        self.mlp_sbf2 = MLP([num_spherical * num_radial, self.dim+self.time_dim])
+        self.mlp_rbf_g = MLP([radial_bessels + 3, self.dim+self.atom_dim+self.time_dim])
+        self.mlp_rbf_l = MLP([radial_bessels + 3, self.dim+self.atom_dim+self.time_dim])
+        self.mlp_sbf1 = MLP([num_spherical * num_radial, self.dim+self.atom_dim+self.time_dim])
+        self.mlp_sbf2 = MLP([num_spherical * num_radial, self.dim+self.atom_dim+self.time_dim])
 
         self.time_mlp = nn.Sequential(
             SinusoidalPositionEmbeddings(self.dim),
@@ -77,11 +74,11 @@ class PAMNet(nn.Module):
 
         self.global_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.global_layer.append(Global_MessagePassing(self.dim+self.time_dim, config.out_dim))
+            self.global_layer.append(Global_MessagePassing(self.dim+self.atom_dim+self.time_dim, config.out_dim))
 
         self.local_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.local_layer.append(Local_MessagePassing(self.dim+self.time_dim, config.out_dim))
+            self.local_layer.append(Local_MessagePassing(self.dim+self.atom_dim+self.time_dim, config.out_dim))
 
         self.out_linear = nn.Linear(2*config.out_dim+self.time_dim, config.out_dim)
         # self.out_linear = nn.Linear(config.out_dim+self.time_dim, config.out_dim)
@@ -126,82 +123,66 @@ class PAMNet(nn.Module):
 
         return idx_i, idx_j, idx_k, idx_kj, idx_ji, idx_i_pair, idx_j1_pair, idx_j2_pair, idx_jj_pair, idx_ji_pair
     
-    def get_non_redundant_edges(self, edge_index, edge_attr, device):
-        edge_index = edge_index.t().tolist()
-        new_edge_index = []
-        new_edge_attr = []
-        for i, j in edge_index:
-            if (i, j) not in self.non_mutable_edges:
-                new_edge_index.append([i, j])
-                new_edge_attr.append(edge_attr[i])
-        return torch.tensor(new_edge_index, device=device).t(), torch.stack(new_edge_attr, dim=0)
+    def get_non_redundant_edges(self, edge_index):
+        out = []
+        for i, pair in enumerate(edge_index.t().tolist()):
+            if tuple(pair) not in self.non_mutable_edges:
+                out.append(i)
+        return edge_index[:, out]
     
     def merge_edge_attr(self, data, shape):
         edge_attr = torch.zeros(shape, device=data.edge_attr.device).float()
         edge_attr[:, 2] = 1
         return torch.cat((edge_attr, data.edge_attr), dim=0)
     
-    def get_interaction_edges(self, data, cutoff):
+    def get_interaction_edges(self, data, dist_knn, edge_index_knn, cutoff):
         atom_names = data.x[:, -4:]
         atoms_argmax = torch.argmax(atom_names, dim=1)
+        out_edges = []     
         c2_atoms = torch.where(atoms_argmax==1)[0]
         c4_or_c6 = torch.where(atoms_argmax==2)[0]
-        n_atoms = torch.where(atoms_argmax==3)[0]
-        
-        base_atoms = torch.cat((c2_atoms, c4_or_c6, n_atoms), dim=0)
-
-        pos = data.x[base_atoms, :3].contiguous()
-        batch = data.batch[base_atoms]
-        row, col = knn(pos, pos, self.knns, batch, batch)
-        edge_index_knn = torch.stack([row, col], dim=0)
-        edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
+        n_atom = torch.where(atoms_argmax==3)[0]
         cutoff_thr = torch.ones_like(dist_knn, device=dist_knn.device) * cutoff
         mask = dist_knn <= cutoff_thr
-        edges = edge_index_knn[:, mask]
-        edges[0, :] = base_atoms[edges[0, :]]
-        edges[1, :] = base_atoms[edges[1, :]]
-        
-        edge_attr = self.merge_edge_attr(data, (edges.size(1),3))
-        edge_indeces = torch.cat((edges, data.edge_index), dim=1) # TODO: should we remove redundant edges?
-        # edge_indeces, edge_attr = self.get_non_redundant_edges(edge_indeces, edge_attr, device=data.edge_attr.device)
-        return edge_indeces, edge_attr
-
-    def sequence_local_attention(self, x, batch, atoms_chunks1:int = 32, atoms_chunks2:int = 32):
-        out = [] # Optimization: extend x to size divisible by atoms_chunks2, apply x.view(-1, atoms_chunks2, self.dim) and then reshape back
-        
-        for i in range(batch.max().item()+1): # iterate over batches to prevent computing attention between atoms in different graphs
-            atoms = x[batch==i]
-            # iterate over diagonal blocks of the matrix and compute attention between atoms in the same graph
-            for j in range(0, atoms.size(0), atoms_chunks1):
-                x_j = atoms[j:j+atoms_chunks1]
-                x_k = atoms[j:j+atoms_chunks2]
-                x_jk, _ = self.attn(x_j, x_k, x_k)
-                out.append(x_jk)
-        return torch.cat(out, dim=0)
+        edge_index = edge_index_knn[:, mask]
+        tmp_data = Data(edge_index=edge_index, x=atom_names)
+        tmp_graph = to_networkx(tmp_data)
+        for atoms in [c2_atoms, c4_or_c6, n_atom]: # TODO: we can create a graph of interactions between all atoms
+            sub_g = tmp_graph.subgraph(atoms.tolist())
+            out_edges.extend(list(sub_g.edges))
+        edges = torch.tensor(out_edges, device=data.edge_index.device).t()
+        edge_g_attr = self.merge_edge_attr(data, (edges.size(1),3))
+        return torch.cat((edges, data.edge_index), dim=1), edge_g_attr
 
     def forward(self, data, t=None):
-        x_raw = data.x.contiguous()
+        x_raw = data.x
         batch = data.batch # This parameter assigns an index to each node in the graph, indicating which graph it belongs to.
 
-        # self.non_mutable_edges = {} # save the indices of edges given by the sequence and 2D structure
-        # for i, j in data.edge_index.t().tolist():
-        #     self.non_mutable_edges[(i, j)] = True
+        if self.non_mutable_edges is None: # save the indices of edges given by the sequence and 2D structure
+            self.non_mutable_edges = {}
+            for i, j in data.edge_index.t().tolist():
+                self.non_mutable_edges[(i, j)] = True
 
         x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
         x = x_raw[:, 3:]  # one-hot encoded atom types
         time_emb = self.time_mlp(t)
         pos = x_raw[:,:3].contiguous()
         x_pos = self.init_linear(pos) # coordinates embeddings
-        x_prop = self.atom_properties(x) # atom properties embeddings
-        x = torch.cat([x_pos, x_prop, time_emb], dim=1)
-        # x = x + self.sequence_local_attention(x, batch, atoms_chunks2=128)
+        x = torch.cat([x_pos, x, time_emb], dim=1)
         
+        row, col = knn(pos, pos, self.knns, batch, batch)
+        edge_index_knn = torch.stack([row, col], dim=0)
+        edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
 
-        edge_index_g, edge_g_attr = self.get_interaction_edges(data, self.cutoff_g)
+
+        # when the distance is too high, then there are too many interactions and it's harder to train
+        # The training can be less stable and the model is more prone to collapse
+
+        edge_index_g, edge_g_attr = self.get_interaction_edges(data, dist_knn, edge_index_knn, self.cutoff_g)
         edge_index_g, dist_g = self.get_edge_info(edge_index_g, pos)
 
 
-        edge_index_l, edge_l_attr = self.get_interaction_edges(data, self.cutoff_l)
+        edge_index_l, edge_l_attr = self.get_interaction_edges(data, dist_knn, edge_index_knn, self.cutoff_l)        
         edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
         
         idx_i, idx_j, idx_k, idx_kj, idx_ji, idx_i_pair, idx_j1_pair, idx_j2_pair, idx_jj_pair, idx_ji_pair = self.indices(edge_index_l, num_nodes=x.size(0))
