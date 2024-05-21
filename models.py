@@ -182,10 +182,6 @@ class PAMNet(nn.Module):
         x_raw = data.x.contiguous()
         batch = data.batch # This parameter assigns an index to each node in the graph, indicating which graph it belongs to.
 
-        # self.non_mutable_edges = {} # save the indices of edges given by the sequence and 2D structure
-        # for i, j in data.edge_index.t().tolist():
-        #     self.non_mutable_edges[(i, j)] = True
-
         x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
         x = x_raw[:, 3:]  # one-hot encoded atom types
         time_emb = self.time_mlp(t)
@@ -193,14 +189,31 @@ class PAMNet(nn.Module):
         x_pos = self.init_linear(pos) # coordinates embeddings
         x_prop = self.atom_properties(x) # atom properties embeddings
         x = torch.cat([x_pos, x_prop, time_emb], dim=1)
-        x = x + self.sequence_local_attention(x, batch)        
-        
+        x = x + self.sequence_local_attention(x, batch)
 
-        edge_index_g, edge_g_attr = self.get_interaction_edges(data, self.cutoff_g)
+        row, col = knn(pos, pos, self.knns, batch, batch)
+        edge_index_knn = torch.stack([row, col], dim=0)
+        edge_index_knn, dist_knn = self.get_edge_info(edge_index_knn, pos)
+
+        # Compute pairwise distances in global layer
+        tensor_g = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_g
+        mask_g = dist_knn <= tensor_g
+        edge_index_g = edge_index_knn[:, mask_g]
+        
+        # edge_index_g = self.get_non_redundant_edges(edge_index_g)
+        edge_g_attr = self.merge_edge_attr(data, (edge_index_g.size(1),3))
+        edge_index_g = torch.cat((edge_index_g, data.edge_index), dim=1)
         edge_index_g, dist_g = self.get_edge_info(edge_index_g, pos)
 
 
-        edge_index_l, edge_l_attr = self.get_interaction_edges(data, self.cutoff_l)
+        # Compute pairwise distances in local layer
+        tensor_l = torch.ones_like(dist_knn, device=dist_knn.device) * self.cutoff_l
+        mask_l = dist_knn <= tensor_l
+        edge_index_l = edge_index_knn[:, mask_l]
+        
+        # edge_index_l = self.get_non_redundant_edges(edge_index_l)
+        edge_l_attr = self.merge_edge_attr(data, (edge_index_l.size(1),3))
+        edge_index_l = torch.cat((edge_index_l, data.edge_index), dim=1)
         edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
         
         idx_i, idx_j, idx_k, idx_kj, idx_ji, idx_i_pair, idx_j1_pair, idx_j2_pair, idx_jj_pair, idx_ji_pair = self.indices(edge_index_l, num_nodes=x.size(0))
