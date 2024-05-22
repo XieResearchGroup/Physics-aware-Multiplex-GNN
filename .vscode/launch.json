@@ -62,6 +62,13 @@
             "request": "launch",
             "program": "tools/extract_bgsu_seq.py",
             "console": "integratedTerminal",
+        },
+        {
+            "name": "Current Python file",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
         }
 
     ]
