@@ -225,7 +225,8 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
         # if rna_file exists, skip
         # if os.path.exists(os.path.join(save_dir_full, name.replace(".pdb", ".pkl"))):
         #     continue
-        
+        if not os.path.exists(rna_file):
+            continue
         try:
             rna_coords, elements, atoms_symbols, residues_names, p_missing, c4_primes, c2, c4_or_c6, n1_or_n9 = load_with_bio(rna_file)
         except ValueError:
@@ -286,13 +287,13 @@ def main():
     
     data_dir = "/home/mjustyna/data/"
     seq_dir = os.path.join(data_dir, "sim_desc")
-    pdbs_dir = os.path.join(data_dir, "desc-pdbs")
+    pdbs_dir = os.path.join(data_dir, "desc-2seg") #"desc-pdbs"
     
     save_dir = os.path.join(".", "data", "RNA-PDB")
     
     # construct_graphs(seq_dir, pdbs_dir, save_dir, "bgsu-pkl")
     # construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
-    construct_graphs(seq_dir, pdbs_dir, save_dir, "desc-pkl-v2")
+    construct_graphs(seq_dir, pdbs_dir, save_dir, "desc-2seg-pkl")
     
 
 if __name__ == "__main__":
