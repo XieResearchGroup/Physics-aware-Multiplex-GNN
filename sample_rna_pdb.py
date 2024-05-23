@@ -39,17 +39,17 @@ def main():
     print('Seed:', args.seed)
     set_seed(args.seed)
     # Load the model
-    epoch = 287
-    model_path = f"save/soft-snow-187/model_{epoch}.h5"
+    epoch = 275
+    model_path = f"save/amber-firefly-290/model_{epoch}.h5"
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g, mode=args.mode, knns=args.knns)
     model = PAMNet(config)
     model.load_state_dict(torch.load(model_path))
     print("Model loaded!")
-    model.eval()
+    model.eval() # when eval, batchnorm is off. This may corrupt the generation of samples
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Device: ", device)
     model.to(device)
-    ds = RNAPDBDataset("data/RNA-PDB/", name='bgsu-pkl', mode='coarse-grain')
+    ds = RNAPDBDataset("data/RNA-PDB/", name='val-raw-pkl-v2', mode='coarse-grain')
     ds_loader = DataLoader(ds, batch_size=6, shuffle=False)
     sampler = Sampler(timesteps=args.timesteps)
     print("Sampling...")

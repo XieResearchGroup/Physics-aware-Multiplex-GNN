@@ -281,19 +281,21 @@ def main():
     # seq_dir = os.path.join(data_dir, "bgsu-seq")
     # pdbs_dir = os.path.join(data_dir, "bgsu-pdbs-unpack")
 
-    # data_dir = "/home/mjustyna/data/test_structs/"
-    # seq_dir = os.path.join(data_dir, "seqs")
-    # pdbs_dir = os.path.join(data_dir, "pdbs")
+    data_dir = "/home/mjustyna/data/test_structs/"
+    seq_dir = os.path.join(data_dir, "seqs")
+    pdbs_dir = os.path.join(data_dir, "pdbs")
     
-    data_dir = "/home/mjustyna/data/"
-    seq_dir = os.path.join(data_dir, "sim_desc")
-    pdbs_dir = os.path.join(data_dir, "desc-2seg") #"desc-pdbs"
+    # data_dir = "/home/mjustyna/data/"
+    # seq_dir = os.path.join(data_dir, "sim_desc")
+    # pdbs_dir = os.path.join(data_dir, "rRNA_tRNA") #"desc-pdbs"
     
     save_dir = os.path.join(".", "data", "RNA-PDB")
     
     # construct_graphs(seq_dir, pdbs_dir, save_dir, "bgsu-pkl")
-    # construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
-    construct_graphs(seq_dir, pdbs_dir, save_dir, "desc-2seg-pkl")
+    construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-train")
+    # pdbs_dir = os.path.join(data_dir, "non_rRNA_tRNA") #"desc-pdbs"
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-test")
     
 
 if __name__ == "__main__":
