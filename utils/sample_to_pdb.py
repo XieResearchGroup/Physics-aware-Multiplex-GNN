@@ -22,17 +22,18 @@ class SampleToPDB():
     def to(self, format: str, sample, path, name, post_fix:str=''):
         # Convert sample to the desired format
         unique_batches = np.unique(sample.batch.cpu().numpy())
-
+        assert format in ['pdb', 'xyz', 'trafl'], f"Invalid format: {format}. Accepted formats: 'pdb', 'xyz', 'trafl'"
         for batch in unique_batches:
             mask = sample.batch == batch
-            if format == 'pdb':
-                self.write_pdb(sample.x[mask], path, name[batch])
-            elif format == 'xyz':
-                self.write_xyz(sample.x[mask], path, name[batch], post_fix)
-            elif format == 'trafl':
-                self.write_trafl(sample.x[mask], path, name[batch])
-            else:
-                raise ValueError(f"Invalid format: {format}. Accepted formats: 'pdb', 'xyz', 'trafl'")
+            try:
+                if format == 'pdb':
+                    self.write_pdb(sample.x[mask], path, name[batch])
+                elif format == 'xyz':
+                    self.write_xyz(sample.x[mask], path, name[batch], post_fix)
+                elif format == 'trafl':
+                    self.write_trafl(sample.x[mask], path, name[batch])
+            except ValueError as e:
+                print("Cannot save molecules with missing P atom.")
 
     def write_xyz(self, x, path, name, post_fix:str='', rnd_dig:int=4):
         atoms_pos, atom_names = self.get_atoms_pos_and_types(x)

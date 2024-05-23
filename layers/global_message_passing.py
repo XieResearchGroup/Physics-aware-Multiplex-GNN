@@ -25,8 +25,8 @@ class Global_MessagePassing(MessagePassing):
         self.mlp_out = MLP([self.dim, self.dim, self.dim, self.dim])
         self.W_out = nn.Linear(self.dim, self.out_dim)
         self.W = nn.Parameter(torch.Tensor(self.dim, self.out_dim))
-        self.bnorm = nn.BatchNorm1d(self.out_dim)
-        self.aggr_bnorm = nn.BatchNorm1d(self.dim)
+        # self.bnorm = nn.BatchNorm1d(self.out_dim)
+        # self.aggr_bnorm = nn.BatchNorm1d(self.dim)
         self.silu_act = nn.SiLU()
 
         self.init()
@@ -50,8 +50,8 @@ class Global_MessagePassing(MessagePassing):
 
         out = self.mlp_out(x)
         att_score = out.matmul(self.W).unsqueeze(0)
-        out = self.W_out(out) # .unsqueeze(0)
-        out = self.bnorm(out).unsqueeze(0)
+        out = self.W_out(out).unsqueeze(0)
+        # out = self.bnorm(out).unsqueeze(0)
 
         return x, out, att_score
 
@@ -62,5 +62,5 @@ class Global_MessagePassing(MessagePassing):
         return self.silu_act(m * self.W_edge_attr(edge_attr))
 
     def update(self, aggr_out):
-        aggr_out = self.aggr_bnorm(aggr_out)
+        # aggr_out = self.aggr_bnorm(aggr_out)
         return aggr_out

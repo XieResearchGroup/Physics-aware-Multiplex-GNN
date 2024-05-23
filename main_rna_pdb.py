@@ -10,6 +10,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DistributedSampler
+from torch.optim.lr_scheduler import StepLR
 from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
 import wandb
@@ -46,21 +47,19 @@ def validation(model, loader, device, sampler, args):
     return np.mean(losses), np.mean(denoise_losses)
 
 def sample(model, loader, device, sampler, epoch, num_batches=None, exp_name: str = "run"):
-    model.eval()
+    # model.eval()
     s = SampleToPDB()
     s_counter = 0
-    for data, name in loader:
-        data = data.to(device)
-        samples = sampler.sample(model, data)[-1]
-        s.to('xyz', samples, f"./samples/{exp_name}/{epoch}", name)
-        try:
+    with torch.no_grad():
+        for data, name in loader:
+            data = data.to(device)
+            samples = sampler.sample(model, data)[-1]
+            s.to('xyz', samples, f"./samples/{exp_name}/{epoch}", name)
             s.to('trafl', samples, f"./samples/{exp_name}/{epoch}", name)
             s_counter += 1
-        except ValueError:
-            print("Cannot save molecules with missing P atom.")
 
-        if num_batches is not None and s_counter >= num_batches:
-            break
+            if num_batches is not None and s_counter >= num_batches:
+                break
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -103,9 +102,9 @@ def main(world_size):
     # Creat dataset
     path = osp.join('.', 'data', args.dataset)
     # train_dataset = RNAPDBDataset(path, name='desc-pkl', mode=args.mode).shuffle()
-    train_dataset = RNAPDBDataset(path, name='desc-2seg-pkl', mode=args.mode).shuffle()
-    val_dataset = RNAPDBDataset(path, name='val-2seg-pkl', mode=args.mode)
-    samp_dataset = RNAPDBDataset(path, name='val-2seg-pkl', mode=args.mode)
+    train_dataset = RNAPDBDataset(path, name='rRNA_tRNA-train', mode=args.mode).shuffle()
+    val_dataset = RNAPDBDataset(path, name='rRNA_tRNA-test', mode=args.mode)
+    samp_dataset = RNAPDBDataset(path, name='rRNA_tRNA-test', mode=args.mode)
 
     dist_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank, shuffle=True)
     val_dist_sampler = DistributedSampler(val_dataset, num_replicas=world_size, rank=rank, shuffle=False)
@@ -124,6 +123,7 @@ def main(world_size):
     model = PAMNet(config).to(device)
     model = DDP(model, device_ids=[rank])
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    scheduler = StepLR(optimizer, step_size=5e4, gamma=0.95)
     # model_path = f"save/divine-shadow-186/model_305.h5"
     # model.load_state_dict(torch.load(model_path))
     # model.to(device)
@@ -147,7 +147,7 @@ def main(world_size):
 
             loss_all.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0) # prevent exploding gradients
-            optimizer.step()
+            scheduler.step()
             losses.append(loss_all.item())
             denoise_losses.append(loss_denoise.item())
             if step % 50 == 0 and step != 0:
