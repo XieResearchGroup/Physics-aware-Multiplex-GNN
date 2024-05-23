@@ -28,7 +28,7 @@ class Local_MessagePassing(torch.nn.Module):
         self.mlp_out = MLP([self.dim, self.dim, self.dim, self.dim])
         self.W_out = nn.Linear(self.dim, self.out_dim)
         self.W = nn.Parameter(torch.Tensor(self.dim, self.out_dim))
-        # self.bnorm = nn.BatchNorm1d(self.out_dim)
+        self.lnorm = nn.LayerNorm(self.out_dim)
         self.silu_act = nn.SiLU()
 
         self.init()
@@ -64,8 +64,8 @@ class Local_MessagePassing(torch.nn.Module):
 
         out = self.mlp_out(x)
         att_score = out.matmul(self.W).unsqueeze(0)
-        out = self.W_out(out).unsqueeze(0)
-        # out = self.bnorm(out).unsqueeze(0)
+        out = self.W_out(out) #.unsqueeze(0)
+        out = self.lnorm(out).unsqueeze(0)
         out = self.silu_act(out)
 
         return x, out, att_score

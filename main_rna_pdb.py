@@ -123,7 +123,7 @@ def main(world_size):
     model = PAMNet(config).to(device)
     model = DDP(model, device_ids=[rank])
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = StepLR(optimizer, step_size=5e4, gamma=0.95)
+    scheduler = StepLR(optimizer, step_size=1, gamma=0.95)
     # model_path = f"save/divine-shadow-186/model_305.h5"
     # model.load_state_dict(torch.load(model_path))
     # model.to(device)
@@ -147,7 +147,7 @@ def main(world_size):
 
             loss_all.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0) # prevent exploding gradients
-            scheduler.step()
+            optimizer.step()
             losses.append(loss_all.item())
             denoise_losses.append(loss_denoise.item())
             if step % 50 == 0 and step != 0:
@@ -162,6 +162,7 @@ def main(world_size):
                 # val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
                 # print(f'Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
             step += 1
+        scheduler.step()
         
         # val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
 

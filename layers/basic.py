@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn import Sequential, Linear #, BatchNorm1d
+from torch.nn import Sequential, Linear, LayerNorm
 from torch.nn import ReLU
 
 import sympy as sym
@@ -18,8 +18,8 @@ class SiLU(nn.Module):
 
 def MLP(channels):
     return Sequential(*[
-        # Sequential(Linear(channels[i - 1], channels[i]), BatchNorm1d(channels[i]), SiLU())
-        Sequential(Linear(channels[i - 1], channels[i]), SiLU())
+        Sequential(Linear(channels[i - 1], channels[i]), LayerNorm(channels[i]), SiLU())
+        # Sequential(Linear(channels[i - 1], channels[i]), SiLU())
         for i in range(1, len(channels))])
 
 
