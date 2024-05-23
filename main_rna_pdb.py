@@ -103,15 +103,15 @@ def main(world_size):
     path = osp.join('.', 'data', args.dataset)
     # train_dataset = RNAPDBDataset(path, name='desc-pkl', mode=args.mode).shuffle()
     train_dataset = RNAPDBDataset(path, name='rRNA_tRNA-train', mode=args.mode).shuffle()
-    val_dataset = RNAPDBDataset(path, name='rRNA_tRNA-test', mode=args.mode)
-    samp_dataset = RNAPDBDataset(path, name='rRNA_tRNA-test', mode=args.mode)
+    val_dataset = RNAPDBDataset(path, name='rRNA_tRNA-val', mode=args.mode)
+    samp_dataset = RNAPDBDataset(path, name='rRNA_tRNA-val', mode=args.mode)
 
     dist_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank, shuffle=True)
     val_dist_sampler = DistributedSampler(val_dataset, num_replicas=world_size, rank=rank, shuffle=False)
     # Load dataset
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, sampler=dist_sampler)
-    val_loader = DataLoader(val_dataset, batch_size=16, sampler=val_dist_sampler)
-    samp_loader = DataLoader(samp_dataset, batch_size=6, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, sampler=val_dist_sampler)
+    # samp_loader = DataLoader(samp_dataset, batch_size=6, shuffle=False)
     print("Data loaded!")
     for data, name in train_loader:
         print(data)
@@ -123,7 +123,7 @@ def main(world_size):
     model = PAMNet(config).to(device)
     model = DDP(model, device_ids=[rank])
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = StepLR(optimizer, step_size=1, gamma=0.95)
+    scheduler = StepLR(optimizer, step_size=50, gamma=0.9)
     # model_path = f"save/divine-shadow-186/model_305.h5"
     # model.load_state_dict(torch.load(model_path))
     # model.to(device)
