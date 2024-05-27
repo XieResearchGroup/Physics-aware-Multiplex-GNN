@@ -121,12 +121,13 @@ def main(world_size):
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g, mode=args.mode, knns=args.knns)
 
     model = PAMNet(config).to(device)
+    # model_path = f"save/eager-waterfall-302/model_26.h5"
+    # model.load_state_dict(torch.load(model_path))
+    # model.to(device)
     model = DDP(model, device_ids=[rank])
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = StepLR(optimizer, step_size=50, gamma=0.9)
-    # model_path = f"save/divine-shadow-186/model_305.h5"
-    # model.load_state_dict(torch.load(model_path))
-    # model.to(device)
+    
     print("Start training!")
     
     dist.barrier()
@@ -182,7 +183,7 @@ def main(world_size):
         if not os.path.exists(save_folder) and rank==0:
             os.makedirs(save_folder)
 
-        if epoch %1 == 0 and rank==0:
+        if epoch %5 == 0 and rank==0:
             print(f"Saving model at epoch {epoch} to {save_folder}")
             torch.save(model.module.state_dict(), f"{save_folder}/model_{epoch}.h5")
 
