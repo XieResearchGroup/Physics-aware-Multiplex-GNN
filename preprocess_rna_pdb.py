@@ -49,6 +49,16 @@ RESIDUE_CONNECTION_GRAPH = [
     [2, 4], # N -> C4/6
 ]
 
+DOT_OPENINGS = ['(', '[', '{', '<', 'A', 'B']
+DOT_CLOSINGS_MAP = {
+    ')': '(',
+    ']': '[',
+    '}': '{',
+    '>': '<',
+    'A': 'a',
+    'B': 'b'
+}
+
 def load_molecule(molecule_file):
     if ".mol2" in molecule_file:
         my_mol = Chem.MolFromMol2File(molecule_file, sanitize=False, removeHs=True)
@@ -186,23 +196,34 @@ def get_bpseq_pairs(rna_file, seq_path):
     if os.path.exists(dot_file):
         with open(dot_file) as f:
             seq, dot = f.readlines()[1:] # the last line is dotbracket
-        dot = dot.strip()
-        res_pairs = dot_to_bpseq(dot)
     else:
         with open(rna_file) as f:
             structure3d = read_3d_structure(f, 1)
             structure2d = extract_secondary_structure(structure3d, 1)
-        res_pairs = bpseq_to_res_ids(structure2d.bpseq)
+        dot = structure2d.extendedDotBracket.split('\n')
+    res_pairs = dot_to_bpseq(dot)
     return res_pairs
 
 def dot_to_bpseq(dot):
-    stack = []
+    stack = {}
     bpseq = []
-    for i, x in enumerate(dot):
-        if x == "(":
-            stack.append(i)
-        elif x == ")":
-            bpseq.append((stack.pop(), i))
+    for dot_line in dot:
+        dot_line = dot_line.strip()
+        if dot_line.startswith(">") or dot_line.startswith("seq"):
+            continue
+        else:
+            dot_line = dot_line.split(' ')
+        if len(dot_line) > 1:
+            dot_line = dot_line[1]
+
+        for i, x in enumerate(dot_line):
+            assert x in DOT_OPENINGS + list(DOT_CLOSINGS_MAP.keys()) + ["."], f"Invalid character in dotbracket: {x}"
+            if x not in stack and x != ".":
+                    stack[x] = []
+            if x in DOT_OPENINGS:
+                stack[x].append(i)
+            elif x in DOT_CLOSINGS_MAP:
+                bpseq.append((stack[DOT_CLOSINGS_MAP[x]].pop(), i))
     return bpseq
 
 
@@ -281,21 +302,22 @@ def main():
     # seq_dir = os.path.join(data_dir, "bgsu-seq")
     # pdbs_dir = os.path.join(data_dir, "bgsu-pdbs-unpack")
 
-    data_dir = "/home/mjustyna/data/test_structs/"
-    seq_dir = os.path.join(data_dir, "seqs")
-    pdbs_dir = os.path.join(data_dir, "pdbs")
+    # data_dir = "/home/mjustyna/data/test_structs/"
+    # seq_dir = os.path.join(data_dir, "seqs")
+    # pdbs_dir = os.path.join(data_dir, "pdbs")
     
-    # data_dir = "/home/mjustyna/data/"
-    # seq_dir = os.path.join(data_dir, "sim_desc")
-    # pdbs_dir = os.path.join(data_dir, "rRNA_tRNA") #"desc-pdbs"
+    data_dir = "/home/mjustyna/data/"
+    seq_dir = os.path.join(data_dir, "sim_desc")
+    pdbs_dir = os.path.join(data_dir, "rRNA_tRNA") #"desc-pdbs"
     
-    save_dir = os.path.join(".", "data", "RNA-PDB")
+    save_dir = os.path.join(".", "data", "RNA-PDB-noncan")
     
     # construct_graphs(seq_dir, pdbs_dir, save_dir, "bgsu-pkl")
-    construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
-    # construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-train")
-    # pdbs_dir = os.path.join(data_dir, "non_rRNA_tRNA") #"desc-pdbs"
-    # construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-test")
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
+
+    construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-train")
+    pdbs_dir = os.path.join(data_dir, "non_rRNA_tRNA")
+    construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-test")
     
 
 if __name__ == "__main__":
