@@ -49,14 +49,16 @@ RESIDUE_CONNECTION_GRAPH = [
     [2, 4], # N -> C4/6
 ]
 
-DOT_OPENINGS = ['(', '[', '{', '<', 'A', 'B']
+DOT_OPENINGS = ['(', '[', '{', '<', 'A', 'B', 'C', 'D']
 DOT_CLOSINGS_MAP = {
     ')': '(',
     ']': '[',
     '}': '{',
     '>': '<',
-    'A': 'a',
-    'B': 'b'
+    'a': 'A',
+    'b': 'B',
+    'c': 'C',
+    'd': 'D'
 }
 
 def load_molecule(molecule_file):
@@ -244,8 +246,8 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
         rna_file = os.path.join(pdbs_dir, name)
         
         # if rna_file exists, skip
-        # if os.path.exists(os.path.join(save_dir_full, name.replace(".pdb", ".pkl"))):
-        #     continue
+        if os.path.exists(os.path.join(save_dir_full, name.replace(".pdb", ".pkl"))):
+            continue
         if not os.path.exists(rna_file):
             continue
         try:
