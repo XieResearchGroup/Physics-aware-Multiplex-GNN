@@ -63,8 +63,8 @@ class PAMNet(nn.Module):
         self.sbf = SphericalBasisLayer(num_spherical, num_radial, self.cutoff_l, envelope_exponent)
 
         # Add 3 to rbf to process the edge attributes with type of the edge
-        self.mlp_rbf_g = MLP([radial_bessels + 3, self.dim+self.atom_dim+self.time_dim])
-        self.mlp_rbf_l = MLP([radial_bessels + 3, self.dim+self.atom_dim+self.time_dim])
+        self.mlp_rbf_g = MLP([radial_bessels, self.dim+self.atom_dim+self.time_dim])
+        self.mlp_rbf_l = MLP([radial_bessels, self.dim+self.atom_dim+self.time_dim])
         self.mlp_sbf1 = MLP([num_spherical * num_radial, self.dim+self.atom_dim+self.time_dim])
         self.mlp_sbf2 = MLP([num_spherical * num_radial, self.dim+self.atom_dim+self.time_dim])
 
@@ -201,7 +201,7 @@ class PAMNet(nn.Module):
         edge_index_g = edge_index_knn[:, mask_g]
         
         # edge_index_g = self.get_non_redundant_edges(edge_index_g)
-        edge_g_attr = self.merge_edge_attr(data, (edge_index_g.size(1),3))
+        # edge_g_attr = self.merge_edge_attr(data, (edge_index_g.size(1),3))
         edge_index_g = torch.cat((edge_index_g, data.edge_index), dim=1)
         edge_index_g, dist_g = self.get_edge_info(edge_index_g, pos)
 
@@ -212,7 +212,7 @@ class PAMNet(nn.Module):
         edge_index_l = edge_index_knn[:, mask_l]
         
         # edge_index_l = self.get_non_redundant_edges(edge_index_l)
-        edge_l_attr = self.merge_edge_attr(data, (edge_index_l.size(1),3))
+        # edge_l_attr = self.merge_edge_attr(data, (edge_index_l.size(1),3))
         edge_index_l = torch.cat((edge_index_l, data.edge_index), dim=1)
         edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
         
@@ -240,8 +240,8 @@ class PAMNet(nn.Module):
         sbf2 = self.sbf(dist_l, angle2, idx_kj)
         
 
-        rbf_l = torch.cat((rbf_l, edge_l_attr), dim=1)
-        rbf_g = torch.cat((rbf_g, edge_g_attr), dim=1)
+        # rbf_l = torch.cat((rbf_l, edge_l_attr), dim=1)
+        # rbf_g = torch.cat((rbf_g, edge_g_attr), dim=1)
         edge_attr_rbf_l = self.mlp_rbf_l(rbf_l)
         edge_attr_rbf_g = self.mlp_rbf_g(rbf_g)
         edge_attr_sbf1 = self.mlp_sbf1(sbf1)
