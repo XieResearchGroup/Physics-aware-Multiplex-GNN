@@ -47,11 +47,12 @@ def validation(model, loader, device, sampler, args):
     return np.mean(losses), np.mean(denoise_losses)
 
 def sample(model, loader, device, sampler, epoch, num_batches=None, exp_name: str = "run"):
-    # model.eval()
+    model.eval()
     s = SampleToPDB()
     s_counter = 0
     with torch.no_grad():
         for data, name in loader:
+            print(f"Sample batch {s_counter}")
             data = data.to(device)
             samples = sampler.sample(model, data)[-1]
             s.to('xyz', samples, f"./samples/{exp_name}/{epoch}", name)
@@ -81,6 +82,8 @@ def main(world_size):
     parser.add_argument('--timesteps', type=int, default=500, help='timesteps')
     parser.add_argument('--wandb', action='store_true', help='Use wandb for logging')
     parser.add_argument('--mode', type=str, default='coarse-grain', help='Mode of the dataset')
+    parser.add_argument('--lr-step', type=int, default=30, help='Step size for learning rate scheduler')
+    parser.add_argument('--lr-gamma', type=float, default=0.9, help='Gamma for learning rate scheduler')
     parser.add_argument('--knns', type=int, default=2, help='Number of knn neighbors')
     args = parser.parse_args()
     
@@ -101,11 +104,9 @@ def main(world_size):
 
     # Creat dataset
     path = osp.join('.', 'data', args.dataset)
-    # train_dataset = RNAPDBDataset(path, name='desc-pkl', mode=args.mode).shuffle()
-    train_dataset = RNAPDBDataset(path, name='rRNA_tRNA-train', mode=args.mode).shuffle()
-    val_dataset = RNAPDBDataset(path, name='rRNA_tRNA-val', mode=args.mode)
-    samp_dataset = RNAPDBDataset(path, name='rRNA_tRNA-val', mode=args.mode)
-
+    train_dataset = RNAPDBDataset(path, name='train-pkl', mode=args.mode).shuffle()
+    val_dataset = RNAPDBDataset(path, name='val-pkl', mode=args.mode)
+   
     dist_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank, shuffle=True)
     val_dist_sampler = DistributedSampler(val_dataset, num_replicas=world_size, rank=rank, shuffle=False)
     # Load dataset
@@ -121,12 +122,12 @@ def main(world_size):
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g, mode=args.mode, knns=args.knns)
 
     model = PAMNet(config).to(device)
-    # model_path = f"save/eager-waterfall-302/model_26.h5"
+    # model_path = f"save/vague-wood-323/model_290.h5"
     # model.load_state_dict(torch.load(model_path))
     # model.to(device)
     model = DDP(model, device_ids=[rank])
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = StepLR(optimizer, step_size=50, gamma=0.9)
+    scheduler = StepLR(optimizer, step_size=args.lr_step, gamma=args.lr_gamma)
     
     print("Start training!")
     
@@ -168,7 +169,7 @@ def main(world_size):
         # val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
 
 
-        if args.wandb and rank == 0:
+        if args.wandb and rank == 0 and losses:
             wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss, "LR": scheduler.get_last_lr()[0]})
         if rank == 0:
             print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}, LR: {scheduler.get_last_lr()[0]}')
