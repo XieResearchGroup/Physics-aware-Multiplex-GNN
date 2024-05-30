@@ -8,20 +8,20 @@
             "name": "Train PDBs",
             "type": "debugpy",
             "request": "launch",
-            "program": "main_rna_pdb.py",
+            "program": "main_rna_pdb_single.py",
             "console": "integratedTerminal",
             "args": [
                 "--dataset",
-                "RNA-PDB",
+                "RNA-PDB-noncan",
                 "--epochs=101",
-                "--batch_size=32",
-                "--dim=128",
-                "--n_layer=2",
+                "--batch_size=64",
+                "--dim=256",
+                "--n_layer=8",
                 "--lr=1e-3",
-                "--timesteps=500",
+                "--timesteps=5000",
                 "--mode",
                 "coarse-grain",
-                "--knn=5"
+                "--knn=20"
             ]
         },
         {
@@ -77,8 +77,8 @@
             "program": "evaluate_predictions.py",
             "console": "integratedTerminal",
             "args": [
-                "--preds-path=/home/mjustyna/RNA-GNN/samples/run/400/",
-                "--templates-path=/home/mjustyna/data/sim_pdb/",
+                "--preds-path=/home/mjustyna/RNA-GNN/samples/elated-gorge-310-eval/800/",
+                "--templates-path=/home/mjustyna/data/desc-pdbs/",
                 "--targets-path=/home/mjustyna/data/desc-pdbs/",
                 "--sim_rna=/home/mjustyna/software/SimRNA_64bitIntel_Linux_staticLibs_withoutOpenMP",
             ]
