@@ -106,13 +106,13 @@ class Sampler():
         coord_mask[:, 3:] = 0
         atoms_mask = 1 - coord_mask
         noise = torch.rand_like(context_mols.x, device=device)
-        # noise = generate_per_residue_noise(context_mols)
         denoised = []
         
         context_mols.x = noise * coord_mask + context_mols.x * atoms_mask
         for i in tqdm(reversed(range(0, self.timesteps)), desc='sampling loop time step', total=self.timesteps):
             context_mols.x = self.p_sample(model, context_mols, torch.full((b,), i, device=device, dtype=torch.long), i, coord_mask, atoms_mask)
-            denoised.append(context_mols.clone().cpu())
+            # denoised.append(context_mols.clone().cpu())
+        denoised.append(context_mols.clone().cpu())
         return denoised
 
 

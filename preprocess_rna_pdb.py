@@ -164,7 +164,7 @@ def get_edges_in_COO(data:dict, seq_segments:list[str], p_missing:list[bool], bp
         curr_p = nodes_indecies[i][np.where(comb_arg_max[i] == 0)[0]] # P atom index in current residue
         edges.append([prev_c4p, curr_p])
         edges.append([curr_p, prev_c4p])
-        edge_type.extend([True, True])
+        edge_type.extend([True, True]) # True means covalent bonds/backbone atoms
 
     # edges based on bpseq (2D structure)
     if bpseq is not None:
@@ -174,7 +174,7 @@ def get_edges_in_COO(data:dict, seq_segments:list[str], p_missing:list[bool], bp
                 at2 = nodes_indecies[pair[1]][np.where(comb_arg_max[pair[1]] == i)[0]]
                 edges.append([at1, at2])
                 edges.append([at2, at1])
-                edge_type.extend([False, False])
+                edge_type.extend([False, False]) # False - other interactions
     assert len(edges) == len(edge_type)
     return edges, edge_type
 
@@ -291,7 +291,11 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
         data['c2'] = np.array(c2)[crs_gr_mask]
         data['c4_or_c6'] = np.array(c4_or_c6)[crs_gr_mask]
         data['n1_or_n9'] = np.array(n1_or_n9)[crs_gr_mask]
-        edges, edge_type = get_edges_in_COO(data, seq_segments, p_missing=p_missing, bpseq=res_pairs)
+        try:
+            edges, edge_type = get_edges_in_COO(data, seq_segments, p_missing=p_missing, bpseq=res_pairs)
+        except ValueError as e:
+            print(f"Error in processing {name}: {e}")
+            continue
         data['edges'] = np.array(edges)
         data['edge_type'] = edge_type
 
@@ -300,26 +304,26 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
 
 
 def main():
-    # data_dir = "/home/mjustyna/data/"
-    # seq_dir = os.path.join(data_dir, "bgsu-seq")
-    # pdbs_dir = os.path.join(data_dir, "bgsu-pdbs-unpack")
+    data_dir = "/home/mjustyna/data/"
+    seq_dir = os.path.join(data_dir, "bgsu-seq")
+    pdbs_dir = os.path.join(data_dir, "bgsu-pdbs-unpack")
 
     # data_dir = "/home/mjustyna/data/test_structs/"
     # seq_dir = os.path.join(data_dir, "seqs")
     # pdbs_dir = os.path.join(data_dir, "pdbs")
     
-    data_dir = "/home/mjustyna/data/"
-    seq_dir = os.path.join(data_dir, "sim_desc")
-    pdbs_dir = os.path.join(data_dir, "rRNA_tRNA") #"desc-pdbs"
+    # data_dir = "/home/mjustyna/data/"
+    # seq_dir = os.path.join(data_dir, "sim_desc")
+    # pdbs_dir = os.path.join(data_dir, "rRNA_tRNA") #"desc-pdbs"
     
-    save_dir = os.path.join(".", "data", "RNA-PDB-noncan")
+    save_dir = os.path.join(".", "data", "RNA-bgsu-noncan")
     
-    # construct_graphs(seq_dir, pdbs_dir, save_dir, "bgsu-pkl")
+    construct_graphs(seq_dir, pdbs_dir, save_dir, "train-pkl")
     # construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
 
-    construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-train")
-    pdbs_dir = os.path.join(data_dir, "non_rRNA_tRNA")
-    construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-test")
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-train")
+    # pdbs_dir = os.path.join(data_dir, "non_rRNA_tRNA")
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-test")
     
 
 if __name__ == "__main__":
