@@ -77,9 +77,11 @@
             "program": "evaluate_predictions.py",
             "console": "integratedTerminal",
             "args": [
-                "--preds-path=/home/mjustyna/RNA-GNN/samples/elated-gorge-310-eval/800/",
-                "--templates-path=/home/mjustyna/data/desc-pdbs/",
-                "--targets-path=/home/mjustyna/data/desc-pdbs/",
+                "--preds-path=/home/mjustyna/RNA-GNN/samples/elated-gorge-310-hl/800/",
+                // "--templates-path=/home/mjustyna/data/desc-pdbs/",
+                // "--targets-path=/home/mjustyna/data/desc-pdbs/",
+                "--templates-path=/home/mjustyna/data/motifs/hl_pdbs/",
+                "--targets-path=/home/mjustyna/data/motifs/hl_pdbs/",
                 "--sim_rna=/home/mjustyna/software/SimRNA_64bitIntel_Linux_staticLibs_withoutOpenMP",
             ]
         }

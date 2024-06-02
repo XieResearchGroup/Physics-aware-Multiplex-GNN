@@ -281,3 +281,13 @@ class PAMNet(nn.Module):
         out = self.out_linear(out)
 
         return out
+    
+    def fine_tuning(self):
+        # freeze all layers
+        for param in self.parameters():
+            param.requires_grad = False
+        # unfreeze the last layer
+        for param in self.out_linear.parameters():
+            param.requires_grad = True
+        # initialize last layer from scratch
+        self.out_linear.reset_parameters()

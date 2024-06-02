@@ -85,7 +85,7 @@ def main():
 
     if args.wandb:
         wandb.login()
-        run = wandb.init(project='RNA-GNN-Diffusion', config=args)
+        run = wandb.init(project='RNA-GNN-sampling', config=args)
         exp_name = run.name
     else:
         exp_name = "test"
@@ -111,12 +111,13 @@ def main():
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g, mode=args.mode, knns=args.knns)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = PAMNet(config).to(device)
-    # model_path = f"save/vague-wood-323/model_290.h5"
-    # model.load_state_dict(torch.load(model_path))
-    # model.to(device)
+    model_path = f"save/still-valley-338/model_800.h5"
+    model.load_state_dict(torch.load(model_path))
+    model.to(device)
+    # model.fine_tuning()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = StepLR(optimizer, step_size=args.lr_step, gamma=args.lr_gamma)
-    
+    max_steps = 2
     print("Start training!")
     for epoch in range(args.epochs):
         model.train()
@@ -138,37 +139,41 @@ def main():
             optimizer.step()
             losses.append(loss_all.item())
             denoise_losses.append(loss_denoise.item())
-            if step % 5 == 0 and step != 0 and args.wandb :
+            if step % 1 == 0 and step != 0 and args.wandb :
                 val_loss, val_denoise_loss = validation(model, val_loader, device, sampler, args)
-                print(f'Epoch: {epoch+1}, Step: {step}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f} LR: {scheduler.get_last_lr()[0]}')
-                wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss, "LR": scheduler.get_last_lr()[0]})
+                print(f'Epoch: {epoch+1}, Step: {step}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}, LR: {scheduler.get_last_lr()[0]}')
+                wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss, 'LR': {scheduler.get_last_lr()[0]}})
                 losses = []
                 denoise_losses = []
             elif not args.wandb:
                 print(f"Epoch: {epoch}, step: {step}, loss: {loss_all.item():.4f} ")
                 # val_loss, val_denoise_loss = test(model, val_loader, device, sampler, args)
                 # print(f'Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
+            # if step >= max_steps:
+            #     break
             step += 1
         scheduler.step()
 
-        if args.wandb:
-            wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss, "LR": scheduler.get_last_lr()[0]})
+        # if args.wandb:
+        #     # wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss, "LR": scheduler.get_last_lr()[0]})
+        #     wandb.log({'Train Loss': np.mean(losses), 'Val Loss': val_loss, 'Denoise Loss': np.mean(denoise_losses), 'Val Denoise Loss': val_denoise_loss})
         
-        print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}, LR: {scheduler.get_last_lr()[0]}')
+        # print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}, LR: {scheduler.get_last_lr()[0]}')
+        # print(f'Epoch: {epoch+1}, Loss: {np.mean(losses):.4f}, Denoise Loss: {np.mean(denoise_losses):.4f}, Val Loss: {val_loss:.4f}, Val Denoise Loss: {val_denoise_loss:.4f}')
                 
         save_folder = f"./save/{exp_name}"
         if not os.path.exists(save_folder):
             os.makedirs(save_folder)
 
-        if epoch %5 == 0:
+        if epoch %1 == 0:
             print(f"Saving model at epoch {epoch} to {save_folder}")
-            torch.save(model.module.state_dict(), f"{save_folder}/model_{epoch}.h5")
+            torch.save(model.state_dict(), f"{save_folder}/model_{epoch}.h5")
 
         # if best_val_loss is None or val_loss < best_val_loss:
         #     best_val_loss = val_loss
         #     torch.save(model.state_dict(), os.path.join(save_folder, "best_model.h5"))
     
-    torch.save(model.module.state_dict(), f"{save_folder}/model_{epoch}.h5")
+    torch.save(model.state_dict(), f"{save_folder}/model_{epoch}.h5")
 
 
 def run(main_fn, world_size):
