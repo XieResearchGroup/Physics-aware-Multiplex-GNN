@@ -5,6 +5,7 @@ wandb/*
 save/*
 tests/test_output/*
 samples/*
+user_inputs/*
 
 # files
 *.pyc

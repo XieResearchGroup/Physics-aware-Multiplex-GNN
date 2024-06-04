@@ -4,7 +4,7 @@ from tqdm import tqdm
 from rdkit import Chem
 import pickle
 import Bio
-from Bio.PDB import PDBParser
+from Bio.PDB import PDBParser, MMCIFParser
 from rnapolis.annotator import extract_secondary_structure
 from rnapolis.parser import read_3d_structure
 # from torch_geometric.data import Data
@@ -28,6 +28,8 @@ RESIDUES = {
     'C': 3,
 }
 REV_RESIDUES = {v: k for k, v in RESIDUES.items()}
+
+KEEP_ELEMENTS = ['C', 'N', 'O', 'P']
 
 COARSE_GRAIN_MAP = {
         'A': ["P", "C4'", "N9", "C2", "C6"],
@@ -77,9 +79,13 @@ def load_molecule(molecule_file):
     xyz = get_xyz_from_mol(my_mol)
     return xyz, my_mol
 
-def load_with_bio(molecule_file):
-    parser = PDBParser()
-    structure = parser.get_structure("rna", molecule_file)
+def load_with_bio(molecule_file, file_type:str=".pdb"):
+    if file_type.endswith("pdb"):
+        parser = PDBParser()
+        structure = parser.get_structure("rna", molecule_file)
+    else:
+        parser = MMCIFParser()
+        structure = parser.get_structure("rna", molecule_file)
     coords = []
     atoms_elements = []
     atoms_names = []
@@ -127,8 +133,13 @@ def get_edges_in_COO(data:dict, seq_segments:list[str], p_missing:list[bool], bp
     # Order of encoded atoms: "P", "C4'", "Nx", "C2", "Cx"
     edges = []
     edge_type = [] # True: covalent, False: other interaction
-    segments_lengs = [len(x) for x in seq_segments]
-    segments_lengs = np.cumsum(segments_lengs) # get the end index of each segment
+    if seq_segments is not None:
+        segments_lengs = [len(x) for x in seq_segments]
+        segments_lengs = np.cumsum(segments_lengs) # get the end index of each segment
+        indicies = np.concatenate([np.array([0]), segments_lengs[:-1]])
+    else:
+        segments_lengs = []
+        indicies = np.array([0])
 
     p = data['atoms'] == ATOM_TYPES['P']
     c4_prime = data['c4_primes']
@@ -139,7 +150,8 @@ def get_edges_in_COO(data:dict, seq_segments:list[str], p_missing:list[bool], bp
     combined = np.stack([p, c4_prime, n1_or_n9, c2, c4_or_c6], axis=1)
 
     added = 0
-    for index in np.concatenate([np.array([0]), segments_lengs[:-1]]):
+    
+    for index in indicies:
         if p_missing[index]: # the missing P can occur only in the first residue of the segment
             combined = np.concatenate([combined[:index*5], np.array([[True, False, False, False, False]]), combined[index*5:]])
             nodes_indecies = np.concatenate([nodes_indecies[:index*5], np.array([nodes_indecies[index*5]]), nodes_indecies[index*5:]]) # add "fake" P atom, with the same node index (that will be filtered out later).
@@ -189,27 +201,33 @@ def bpseq_to_res_ids(bpseq):
     bpseq = [(int(x[0])-1, int(x[2])-1) for x in bpseq if int(x[2]) != 0 and int(x[0]) < int(x[2])] # -1, because the indices in bpseq are 1-based, and we need 0-based (numpy indicies)
     return bpseq
 
-def get_bpseq_pairs(rna_file, seq_path):
+def get_bpseq_pairs(rna_file, seq_path, extended_dotbracket=True):
     """
     If dotbracket file in seq_path is available, then read it and parse it to bpseq.
     Else Read 2D structure from 3D file.
     """
-    dot_file = seq_path.replace(".seq", ".dot")
-    if os.path.exists(dot_file):
+    if seq_path is not None:
+        dot_file = seq_path.replace(".seq", ".dot")
+    else:
+        dot_file = None
+    if dot_file is not None and os.path.exists(dot_file):
         with open(dot_file) as f:
-            seq, dot = f.readlines()[1:] # the last line is dotbracket
+            dot = f.readlines() # the last line is dotbracket
     else:
         with open(rna_file) as f:
             structure3d = read_3d_structure(f, 1)
             structure2d = extract_secondary_structure(structure3d, 1)
-        dot = structure2d.extendedDotBracket.split('\n')
+        if extended_dotbracket: # include non-canonical pairings
+            dot = structure2d.extendedDotBracket.split('\n')
+        else:
+            dot = structure2d.dotBracket.split('\n')
     res_pairs = dot_to_bpseq(dot)
     return res_pairs
 
 def dot_to_bpseq(dot):
     stack = {}
     bpseq = []
-    for dot_line in dot:
+    for dot_line in dot[2:]:
         dot_line = dot_line.strip()
         if dot_line.startswith(">") or dot_line.startswith("seq"):
             continue
@@ -217,7 +235,9 @@ def dot_to_bpseq(dot):
             dot_line = dot_line.split(' ')
         if len(dot_line) > 1:
             dot_line = dot_line[1]
-
+        else:
+            dot_line = dot_line[0]
+    
         for i, x in enumerate(dot_line):
             assert x in DOT_OPENINGS + list(DOT_CLOSINGS_MAP.keys()) + ["."], f"Invalid character in dotbracket: {x}"
             if x not in stack and x != ".":
@@ -229,29 +249,38 @@ def dot_to_bpseq(dot):
     return bpseq
 
 
-def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
+def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name, file_3d_type:str=".pdb", extended_dotbracket:bool=True):
     save_dir_full = os.path.join(save_dir, save_name)
 
     if not os.path.exists(save_dir_full):
         os.makedirs(save_dir_full)
        
-    name_list = [x for x in os.listdir(seq_dir)]
-    name_list = [x for x in name_list if ".seq" in x]
+    if seq_dir is not None:
+        name_list = [x for x in os.listdir(seq_dir)]
+        name_list = [x for x in name_list if ".seq" in x]
+    else:
+        name_list = [x for x in os.listdir(pdbs_dir)]
+        name_list = [x for x in name_list if file_3d_type in x]
 
     for i in tqdm(range(len(name_list))):
         name = name_list[i]
-        seq_path = os.path.join(seq_dir, name)
-        seq_segments = read_seq_segments(seq_path)
-        name = name.replace(".seq", ".pdb")
+        if seq_dir is not None:
+            seq_path = os.path.join(seq_dir, name)
+            seq_segments = read_seq_segments(seq_path)
+            name = name.replace(".seq", file_3d_type)
+        else:
+            seq_path = None
+            seq_segments = None
         rna_file = os.path.join(pdbs_dir, name)
         
         # if rna_file exists, skip
-        if os.path.exists(os.path.join(save_dir_full, name.replace(".pdb", ".pkl"))):
+        if os.path.exists(os.path.join(save_dir_full, name.replace(file_3d_type, ".pkl"))):
             continue
         if not os.path.exists(rna_file):
+            print("File not found", rna_file)
             continue
         try:
-            rna_coords, elements, atoms_symbols, residues_names, p_missing, c4_primes, c2, c4_or_c6, n1_or_n9 = load_with_bio(rna_file)
+            rna_coords, elements, atoms_symbols, residues_names, p_missing, c4_primes, c2, c4_or_c6, n1_or_n9 = load_with_bio(rna_file, file_3d_type)
         except ValueError:
             print("Error reading molecule", rna_file)
             continue
@@ -260,10 +289,12 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
             continue
         
 
-        res_pairs = get_bpseq_pairs(rna_file, seq_path=seq_path)
+        res_pairs = get_bpseq_pairs(rna_file, seq_path=seq_path, extended_dotbracket=extended_dotbracket)
         
 
-        x_indices = [i for i,x in enumerate(elements) if (x != 'H' and x != 'X')] # Remove Hydrogen, ions, etc. Keep only C, N, O, P
+        elem_indices = set([i for i,x in enumerate(elements) if x in KEEP_ELEMENTS]) # keep only C, N, O, P atoms, remove all the others
+        res_indices = set([i for i,x in enumerate(residues_names) if x in RESIDUES.keys()]) # keep only A, G, U, C residues, remove all the others
+        x_indices = list(elem_indices.intersection(res_indices))
         elements = [elements[i] for i in x_indices]
         atoms_symbols = [atoms_symbols[i] for i in x_indices]
         residues_names = [residues_names[i] for i in x_indices]
@@ -294,36 +325,46 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name):
         try:
             edges, edge_type = get_edges_in_COO(data, seq_segments, p_missing=p_missing, bpseq=res_pairs)
         except ValueError as e:
-            print(f"Error in processing {name}: {e}")
+            print(f"Value Error in processing {name}: {e}")
+            continue
+        except IndexError as e:
+            print(f"Index Error in processing {name}: {e}")
             continue
         data['edges'] = np.array(edges)
         data['edge_type'] = edge_type
 
-        with open(os.path.join(save_dir_full, name.replace(".pdb", ".pkl")), "wb") as f:
+        with open(os.path.join(save_dir_full, name.replace(file_3d_type, ".pkl")), "wb") as f:
             pickle.dump(data, f)
 
 
 def main():
-    data_dir = "/home/mjustyna/data/"
-    seq_dir = os.path.join(data_dir, "bgsu-seq")
-    pdbs_dir = os.path.join(data_dir, "bgsu-pdbs-unpack")
+    extended_dotbracket = False
+    # data_dir = "/home/mjustyna/data/motifs/"
+    # seq_dir = os.path.join(data_dir, "hl_seqs")
+    # pdbs_dir = os.path.join(data_dir, "hl_pdbs")
+    # save_dir = os.path.join(".", "data", "RNA-bgsu-hl-cn")
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "train-pkl", extended_dotbracket=extended_dotbracket)
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl", extended_dotbracket=extended_dotbracket)
 
     # data_dir = "/home/mjustyna/data/test_structs/"
     # seq_dir = os.path.join(data_dir, "seqs")
     # pdbs_dir = os.path.join(data_dir, "pdbs")
+
+    data_dir = "/home/mjustyna/data/rna3db-mmcifs/"
+    seq_dir = None
+    pdbs_dir = os.path.join(data_dir, "test_cifs")
+    save_dir = os.path.join(".", "data", "rna3db")
+    construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl", file_3d_type='.cif', extended_dotbracket=extended_dotbracket)
     
     # data_dir = "/home/mjustyna/data/"
     # seq_dir = os.path.join(data_dir, "sim_desc")
     # pdbs_dir = os.path.join(data_dir, "rRNA_tRNA") #"desc-pdbs"
     
-    save_dir = os.path.join(".", "data", "RNA-bgsu-noncan")
     
-    construct_graphs(seq_dir, pdbs_dir, save_dir, "train-pkl")
-    # construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl")
 
-    # construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-train")
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-train", extended_dotbracket=extended_dotbracket)
     # pdbs_dir = os.path.join(data_dir, "non_rRNA_tRNA")
-    # construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-test")
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "rRNA_tRNA-test", extended_dotbracket=extended_dotbracket)
     
 
 if __name__ == "__main__":

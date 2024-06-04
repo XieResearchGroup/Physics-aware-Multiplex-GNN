@@ -77,14 +77,26 @@
             "program": "evaluate_predictions.py",
             "console": "integratedTerminal",
             "args": [
-                "--preds-path=/home/mjustyna/RNA-GNN/samples/elated-gorge-310-hl/800/",
+                "--preds-path=/home/mjustyna/RNA-GNN/samples/elated-gorge-310-user/800/",
                 // "--templates-path=/home/mjustyna/data/desc-pdbs/",
                 // "--targets-path=/home/mjustyna/data/desc-pdbs/",
-                "--templates-path=/home/mjustyna/data/motifs/hl_pdbs/",
-                "--targets-path=/home/mjustyna/data/motifs/hl_pdbs/",
+                // "--templates-path=/home/mjustyna/data/motifs/hl_pdbs/",
+                // "--targets-path=/home/mjustyna/data/motifs/hl_pdbs/",
+                "--templates-path=/home/mjustyna/RNA-GNN/user_inputs/pdbs/",
                 "--sim_rna=/home/mjustyna/software/SimRNA_64bitIntel_Linux_staticLibs_withoutOpenMP",
             ]
-        }
+        },
+        {
+            "name": "User Input",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "prepare_user_input.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--input-dir=user_inputs",
+            ]
+        },
+
 
     ]
 }

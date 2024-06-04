@@ -50,11 +50,11 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Device: ", device)
     model.to(device)
-    ds = RNAPDBDataset("data/RNA-bgsu-j3/", name='test-pkl', mode='coarse-grain')
+    ds = RNAPDBDataset("data/user_inputs/", name='test-pkl', mode='coarse-grain')
     ds_loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False, pin_memory=True)
     sampler = Sampler(timesteps=args.timesteps)
     print("Sampling...")
-    sample(model, ds_loader, device, sampler, epoch, num_batches=None, exp_name=f"{exp_name}-j3")
+    sample(model, ds_loader, device, sampler, epoch, num_batches=None, exp_name=f"{exp_name}-user")
 
 if __name__ == "__main__":
     main()
