@@ -290,4 +290,4 @@ class PAMNet(nn.Module):
         for param in self.out_linear.parameters():
             param.requires_grad = True
         # initialize last layer from scratch
-        self.out_linear.reset_parameters()
+        # self.out_linear.reset_parameters()

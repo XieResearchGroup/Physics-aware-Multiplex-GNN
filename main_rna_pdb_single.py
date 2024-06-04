@@ -114,7 +114,7 @@ def main():
     model_path = f"save/still-valley-338/model_800.h5"
     model.load_state_dict(torch.load(model_path))
     model.to(device)
-    # model.fine_tuning()
+    model.fine_tuning()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = StepLR(optimizer, step_size=args.lr_step, gamma=args.lr_gamma)
     max_steps = 2
