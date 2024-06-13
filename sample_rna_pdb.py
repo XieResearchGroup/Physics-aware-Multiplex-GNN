@@ -51,6 +51,7 @@ def main():
     print("Device: ", device)
     model.to(device)
     ds = RNAPDBDataset("data/user_inputs/", name='test-pkl', mode='coarse-grain')
+    # ds = RNAPDBDataset("data/RNA-bgsu-hl-cn/", name='test-pkl', mode='coarse-grain')
     ds_loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False, pin_memory=True)
     sampler = Sampler(timesteps=args.timesteps)
     print("Sampling...")

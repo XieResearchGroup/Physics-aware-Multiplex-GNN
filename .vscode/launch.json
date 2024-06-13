@@ -14,7 +14,7 @@
                 "--dataset",
                 "RNA-PDB-noncan",
                 "--epochs=101",
-                "--batch_size=64",
+                "--batch_size=8",
                 "--dim=256",
                 "--n_layer=8",
                 "--lr=1e-3",
@@ -81,7 +81,7 @@
                 // "--templates-path=/home/mjustyna/data/desc-pdbs/",
                 // "--targets-path=/home/mjustyna/data/desc-pdbs/",
                 // "--templates-path=/home/mjustyna/data/motifs/hl_pdbs/",
-                // "--targets-path=/home/mjustyna/data/motifs/hl_pdbs/",
+                "--targets-path=/home/mjustyna/data/motifs/hl_pdbs/",
                 "--templates-path=/home/mjustyna/RNA-GNN/user_inputs/pdbs/",
                 "--sim_rna=/home/mjustyna/software/SimRNA_64bitIntel_Linux_staticLibs_withoutOpenMP",
             ]

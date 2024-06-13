@@ -3,11 +3,9 @@ import torch
 import numpy as np
 import pickle
 from torch_geometric.data import Data, Dataset
-from preprocess_rna_pdb import REV_RESIDUES, COARSE_GRAIN_MAP
+from constants import BACKBONE_ATOMS, REV_RESIDUES
 
 class RNAPDBDataset(Dataset):
-    backbone_atoms = ['P', 'O5\'', 'C5\'', 'C4\'', 'C3\'', 'O3\'']
-    
     def __init__(self,
                  path: str,
                  name: str,
@@ -28,13 +26,13 @@ class RNAPDBDataset(Dataset):
         return len(self.files)
 
     def get(self, idx):
-        data_x, edges, name, edges_type = self.get_raw_sample(idx)
+        data_x, edges, name, edges_type, seq = self.get_raw_sample(idx)
         data = Data(
             x=data_x,
             edge_index=edges.t().contiguous(),
             edge_attr=edges_type
         )
-        return data, name
+        return data, name, "".join(seq)
 
     def get_raw_sample(self, idx):
         if torch.is_tensor(idx):
@@ -69,6 +67,10 @@ class RNAPDBDataset(Dataset):
             c2 = torch.tensor(c2).float().unsqueeze(1)
             c4_or_c6 = torch.tensor(c4_or_c6).float().unsqueeze(1)
             n1_or_n9 = torch.tensor(n1_or_n9).float().unsqueeze(1)
+        residue_names = np.array([REV_RESIDUES[res] for res in residues])
+        n_pos = torch.where(n1_or_n9)[0]
+        residue_names = residue_names[n_pos]
+        
         residues = torch.nn.functional.one_hot(torch.tensor(residues).to(torch.int64), num_classes=4).float()
 
         if c2 is not None:
@@ -78,10 +80,10 @@ class RNAPDBDataset(Dataset):
         edges = torch.tensor(sample['edges'])
         if len(edges.shape) == 3:
             edges = edges.squeeze(2)
-        return data_x, edges, name, torch.nn.functional.one_hot(torch.tensor(sample['edge_type']).to(torch.int64), num_classes=3).float()
+        return data_x, edges, name, torch.nn.functional.one_hot(torch.tensor(sample['edge_type']).to(torch.int64), num_classes=3).float(), residue_names
 
     def backbone_only(self, atom_pos, atom_types, sample):
-        mask = [True if atom in self.backbone_atoms else False for atom in sample['symbols']]
+        mask = [True if atom in BACKBONE_ATOMS else False for atom in sample['symbols']]
         c4_primes = sample['c4_primes']
         residues = sample['residues']
         return atom_pos[mask], atom_types[mask], c4_primes[mask], residues[mask]

@@ -36,11 +36,11 @@ def validation(model, loader, device, sampler, args):
     losses = []
     denoise_losses = []
     with torch.no_grad():
-        for data, name in loader:
+        for data, name, seqs in loader:
             data = data.to(device)
             t = torch.randint(0, args.timesteps, (args.batch_size,), device=device).long() # Generate random timesteps
             graphs_t = t[data.batch]
-            loss, denoise_loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
+            loss, denoise_loss = p_losses(model, data, seqs, graphs_t, sampler=sampler, loss_type="huber")
             losses.append(loss.item())
             denoise_losses.append(denoise_loss.item())
     model.train()
@@ -51,10 +51,10 @@ def sample(model, loader, device, sampler, epoch, num_batches=None, exp_name: st
     s = SampleToPDB()
     s_counter = 0
     with torch.no_grad():
-        for data, name in loader:
+        for data, name, seqs in loader:
             print(f"Sample batch {s_counter}")
             data = data.to(device)
-            samples = sampler.sample(model, data)[-1]
+            samples = sampler.sample(model, seqs, data)[-1]
             s.to('xyz', samples, f"./samples/{exp_name}/{epoch}", name)
             s.to('trafl', samples, f"./samples/{exp_name}/{epoch}", name)
             s_counter += 1
@@ -93,7 +93,7 @@ def main(world_size):
 
     if args.wandb and rank == 0:
         wandb.login()
-        run = wandb.init(project='RNA-GNN-Diffusion', config=args)
+        run = wandb.init(project='RNA-GNN-Diff-SeqEncoder', config=args)
         exp_name = run.name
     else:
         exp_name = "test"
@@ -114,7 +114,7 @@ def main(world_size):
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, sampler=val_dist_sampler)
     # samp_loader = DataLoader(samp_dataset, batch_size=6, shuffle=False)
     print("Data loaded!")
-    for data, name in train_loader:
+    for data, name, seqs in train_loader:
         print(data)
         break
 
@@ -125,7 +125,7 @@ def main(world_size):
     # model_path = f"save/vague-wood-323/model_290.h5"
     # model.load_state_dict(torch.load(model_path))
     # model.to(device)
-    model = DDP(model, device_ids=[rank])
+    model = DDP(model, device_ids=[rank], find_unused_parameters=True)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = StepLR(optimizer, step_size=args.lr_step, gamma=args.lr_gamma)
     
@@ -137,7 +137,7 @@ def main(world_size):
         step = 0
         losses = []
         denoise_losses = []
-        for data, name in train_loader:
+        for data, name, seqs in train_loader:
             
             data = data.to(device)
             optimizer.zero_grad()
@@ -145,7 +145,7 @@ def main(world_size):
             t = torch.randint(0, args.timesteps, (args.batch_size,), device=device).long() # Generate random timesteps
             graphs_t = t[data.batch]
             
-            loss_all, loss_denoise = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
+            loss_all, loss_denoise = p_losses(model, data, seqs, graphs_t, sampler=sampler, loss_type="huber")
 
             loss_all.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0) # prevent exploding gradients

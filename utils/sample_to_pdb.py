@@ -3,19 +3,10 @@ import Bio
 import Bio.PDB
 import numpy as np
 from torch import Tensor
-from preprocess_rna_pdb import REV_ATOM_TYPES
-
+from constants import REV_ATOM_TYPES, RIBOSE, BASES
 
 
 class SampleToPDB():
-    RIBOSE = ['C1\'', 'C2\'', 'C3\'', 'C4\'', 'O4\'', 'C5\'', 'O5\'', 'P']
-    BASES = {
-        "A": ['N9', 'C8', 'N7', 'C5', 'C6', 'N6', 'N1', 'C2', 'N3', 'C4'],
-        "G": ['N9', 'C8', 'N7', 'C5', 'C6', 'O6', 'N1', 'C2', 'N2', 'N3', 'C4'],
-        "C": ['N1', 'C2', 'O2', 'N3', 'C4', 'N4', 'C5', 'C6'],
-        "U": ['N1', 'C2', 'O2', 'N3', 'C4', 'O4', 'C5', 'C6'],
-    }
-
     def __init__(self):
         pass
 

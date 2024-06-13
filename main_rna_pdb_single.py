@@ -36,11 +36,11 @@ def validation(model, loader, device, sampler, args):
     losses = []
     denoise_losses = []
     with torch.no_grad():
-        for data, name in loader:
+        for data, name, seqs in loader:
             data = data.to(device)
             t = torch.randint(0, args.timesteps, (args.batch_size,), device=device).long() # Generate random timesteps
             graphs_t = t[data.batch]
-            loss, denoise_loss = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
+            loss, denoise_loss = p_losses(model, data, seqs, graphs_t, sampler=sampler, loss_type="huber")
             losses.append(loss.item())
             denoise_losses.append(denoise_loss.item())
     model.train()
@@ -51,10 +51,10 @@ def sample(model, loader, device, sampler, epoch, num_batches=None, exp_name: st
     s = SampleToPDB()
     s_counter = 0
     with torch.no_grad():
-        for data, name in loader:
+        for data, name, seqs in loader:
             print(f"Sample batch {s_counter}")
             data = data.to(device)
-            samples = sampler.sample(model, data)[-1]
+            samples = sampler.sample(model, seqs, data)[-1]
             s.to('xyz', samples, f"./samples/{exp_name}/{epoch}", name)
             s.to('trafl', samples, f"./samples/{exp_name}/{epoch}", name)
             s_counter += 1
@@ -103,7 +103,7 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size)
     # samp_loader = DataLoader(samp_dataset, batch_size=6, shuffle=False)
     print("Data loaded!")
-    for data, name in train_loader:
+    for data, name, seqs in train_loader:
         print(data)
         break
 
@@ -111,10 +111,10 @@ def main():
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g, mode=args.mode, knns=args.knns)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = PAMNet(config).to(device)
-    model_path = f"save/still-valley-338/model_800.h5"
-    model.load_state_dict(torch.load(model_path))
-    model.to(device)
-    model.fine_tuning()
+    # model_path = f"save/still-valley-338/model_800.h5"
+    # model.load_state_dict(torch.load(model_path))
+    # model.to(device)
+    # model.fine_tuning()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = StepLR(optimizer, step_size=args.lr_step, gamma=args.lr_gamma)
     max_steps = 2
@@ -124,7 +124,7 @@ def main():
         step = 0
         losses = []
         denoise_losses = []
-        for data, name in train_loader:
+        for data, name, seqs in train_loader:
             
             data = data.to(device)
             optimizer.zero_grad()
@@ -132,7 +132,7 @@ def main():
             t = torch.randint(0, args.timesteps, (args.batch_size,), device=device).long() # Generate random timesteps
             graphs_t = t[data.batch]
             
-            loss_all, loss_denoise = p_losses(model, data, graphs_t, sampler=sampler, loss_type="huber")
+            loss_all, loss_denoise = p_losses(model, data, seqs, graphs_t, sampler=sampler, loss_type="huber")
 
             loss_all.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0) # prevent exploding gradients

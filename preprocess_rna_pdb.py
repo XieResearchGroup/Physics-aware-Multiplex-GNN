@@ -11,57 +11,8 @@ from rnapolis.parser import read_3d_structure
 import warnings
 from Bio import BiopythonWarning
 warnings.simplefilter('ignore', BiopythonWarning)
-
-ATOM_TYPES = {
-            'C': 0,   #C
-            'N': 1,   #N
-            'O': 2,   #O
-            'P': 3,   #P
-        }
-
-REV_ATOM_TYPES = {v: k for k, v in ATOM_TYPES.items()}
-
-RESIDUES = {
-    'A': 0,
-    'G': 1,
-    'U': 2,
-    'C': 3,
-}
-REV_RESIDUES = {v: k for k, v in RESIDUES.items()}
-
-KEEP_ELEMENTS = ['C', 'N', 'O', 'P']
-
-COARSE_GRAIN_MAP = {
-        'A': ["P", "C4'", "N9", "C2", "C6"],
-        'G': ["P", "C4'", "N9", "C2", "C6"],
-        "U": ["P", "C4'", "N1", "C2", "C4"],
-        "C": ["P", "C4'", "N1", "C2", "C4"],
-    }
-
-RESIDUE_CONNECTION_GRAPH = [
-    [0, 1], # P -> C4'
-    [1, 0], # C4' -> P
-    [1, 2], # C4' -> N
-    [2, 1], # N -> C4'
-    [2, 3], # N -> C2
-    [3, 2], # C2 -> N
-    [3, 4], # C2 -> C4/6
-    [4, 3], # C4/6 -> C2
-    [4, 2], # C4/6 -> N
-    [2, 4], # N -> C4/6
-]
-
-DOT_OPENINGS = ['(', '[', '{', '<', 'A', 'B', 'C', 'D']
-DOT_CLOSINGS_MAP = {
-    ')': '(',
-    ']': '[',
-    '}': '{',
-    '>': '<',
-    'a': 'A',
-    'b': 'B',
-    'c': 'C',
-    'd': 'D'
-}
+from constants import RESIDUES, ATOM_TYPES, RESIDUE_CONNECTION_GRAPH,\
+    DOT_OPENINGS, DOT_CLOSINGS_MAP, KEEP_ELEMENTS, COARSE_GRAIN_MAP
 
 def load_molecule(molecule_file):
     if ".mol2" in molecule_file:
@@ -339,22 +290,22 @@ def construct_graphs(seq_dir, pdbs_dir, save_dir, save_name, file_3d_type:str=".
 
 def main():
     extended_dotbracket = False
-    # data_dir = "/home/mjustyna/data/motifs/"
-    # seq_dir = os.path.join(data_dir, "hl_seqs")
-    # pdbs_dir = os.path.join(data_dir, "hl_pdbs")
-    # save_dir = os.path.join(".", "data", "RNA-bgsu-hl-cn")
+    data_dir = "/home/mjustyna/data/motifs/"
+    seq_dir = os.path.join(data_dir, "hl_seqs")
+    pdbs_dir = os.path.join(data_dir, "hl_pdbs")
+    save_dir = os.path.join(".", "data", "RNA-bgsu-hl-cn")
     # construct_graphs(seq_dir, pdbs_dir, save_dir, "train-pkl", extended_dotbracket=extended_dotbracket)
-    # construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl", extended_dotbracket=extended_dotbracket)
+    construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl", extended_dotbracket=extended_dotbracket)
 
     # data_dir = "/home/mjustyna/data/test_structs/"
     # seq_dir = os.path.join(data_dir, "seqs")
     # pdbs_dir = os.path.join(data_dir, "pdbs")
 
-    data_dir = "/home/mjustyna/data/rna3db-mmcifs/"
-    seq_dir = None
-    pdbs_dir = os.path.join(data_dir, "test_cifs")
-    save_dir = os.path.join(".", "data", "rna3db")
-    construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl", file_3d_type='.cif', extended_dotbracket=extended_dotbracket)
+    # data_dir = "/home/mjustyna/data/rna3db-mmcifs/"
+    # seq_dir = None
+    # pdbs_dir = os.path.join(data_dir, "test_cifs")
+    # save_dir = os.path.join(".", "data", "rna3db")
+    # construct_graphs(seq_dir, pdbs_dir, save_dir, "test-pkl", file_3d_type='.cif', extended_dotbracket=extended_dotbracket)
     
     # data_dir = "/home/mjustyna/data/"
     # seq_dir = os.path.join(data_dir, "sim_desc")

@@ -4,6 +4,7 @@ from utils import Sampler, generate_per_residue_noise
 
 def p_losses(denoise_model,
              x_data,
+             seqs,
              t,
              sampler: Sampler,
              loss_type="huber",
@@ -20,7 +21,7 @@ def p_losses(denoise_model,
                                )
     x_noisy = torch.cat((x_noisy[:,:3], x_data.x[:,3:]), dim=1)
     x_data.x = x_noisy
-    predicted_noise = denoise_model(x_data, t)
+    predicted_noise = denoise_model(x_data, seqs, t)
     # import cProfile
     # with cProfile.Profile() as p:
     #     predicted_noise = denoise_model(x_data, t)

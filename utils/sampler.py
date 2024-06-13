@@ -69,7 +69,7 @@ class Sampler():
 
         
     @torch.no_grad()
-    def p_sample(self, model, x_raw, t, t_index, coord_mask, atoms_mask):
+    def p_sample(self, model, seqs, x_raw, t, t_index, coord_mask, atoms_mask):
         x = x_raw.x * coord_mask
         betas_t = self.extract(self.betas, t, x.shape)
         sqrt_one_minus_alphas_cumprod_t = self.extract(
@@ -80,7 +80,7 @@ class Sampler():
         # Equation 11 in the paper
         # Use our model (noise predictor) to predict the mean
         model_mean = sqrt_recip_alphas_t * (
-            x - betas_t * model(x_raw, t)*coord_mask / sqrt_one_minus_alphas_cumprod_t
+            x - betas_t * model(x_raw, seqs, t)*coord_mask / sqrt_one_minus_alphas_cumprod_t
         )
 
         if t_index == 0:
@@ -97,7 +97,7 @@ class Sampler():
 
     # Algorithm 2 (including returning all images)
     @torch.no_grad()
-    def p_sample_loop(self, model, shape, context_mols):
+    def p_sample_loop(self, model, seqs, shape, context_mols):
         device = next(model.parameters()).device
 
         b = shape[0]
@@ -110,15 +110,15 @@ class Sampler():
         
         context_mols.x = noise * coord_mask + context_mols.x * atoms_mask
         for i in tqdm(reversed(range(0, self.timesteps)), desc='sampling loop time step', total=self.timesteps):
-            context_mols.x = self.p_sample(model, context_mols, torch.full((b,), i, device=device, dtype=torch.long), i, coord_mask, atoms_mask)
+            context_mols.x = self.p_sample(model, seqs, context_mols, torch.full((b,), i, device=device, dtype=torch.long), i, coord_mask, atoms_mask)
             # denoised.append(context_mols.clone().cpu())
         denoised.append(context_mols.clone().cpu())
         return denoised
 
 
     @torch.no_grad()
-    def sample(self, model, context_mols):
-        return self.p_sample_loop(model, shape=context_mols.x.shape, context_mols=context_mols)
+    def sample(self, model, seqs, context_mols):
+        return self.p_sample_loop(model, seqs, shape=context_mols.x.shape, context_mols=context_mols)
 
 
     # forward diffusion (using the nice property)

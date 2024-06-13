@@ -3,12 +3,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_sparse import SparseTensor
-from torch_geometric.data import Data
-from torch_geometric.nn import global_mean_pool, global_add_pool, radius, knn
-from torch_geometric.utils import remove_self_loops, to_networkx
+from torch_geometric.nn import knn
+from torch_geometric.utils import remove_self_loops
+from rinalmo.pretrained import get_pretrained_model
 
-from layers import Global_MessagePassing, Local_MessagePassing, Local_MessagePassing_s, \
+from layers import Global_MessagePassing, Local_MessagePassing, \
     BesselBasisLayer, SphericalBasisLayer, MLP
+
+from constants import REV_RESIDUES
 
 class Config(object):
     def __init__(self, dataset, dim, n_layer, cutoff_l, cutoff_g, mode, knns:int):
@@ -36,6 +38,31 @@ class SinusoidalPositionEmbeddings(nn.Module):
         embeddings = time[:, None] * embeddings[None, :]
         embeddings = torch.cat((embeddings.sin(), embeddings.cos()), dim=-1)
         return embeddings
+    
+class SequenceModule(nn.Module):
+    def __init__(self, dim):
+        super(SequenceModule, self).__init__()
+        self.rinalmo, self.alphabet = get_pretrained_model(model_name="giga-v1")
+        self.out_embedding = nn.Linear(1280, dim, bias=False)
+        self.emb_act = nn.ReLU()
+
+    def forward(self, seqs, device):
+        # RiNALMo - RiboNucleic Acid Language Model
+        # Future TODO:
+        # Combine the embeddings with 3D structure coordinates in attention blocks
+        # tokens: 0- begin, 1 - pad, 2 - end
+        self.rinalmo.eval()
+        tokens = torch.tensor(self.alphabet.batch_tokenize(seqs), dtype=torch.int64, device=device)
+        flat_tokens = tokens.flatten()
+        nt_positions = torch.where(flat_tokens > 4)[0]
+        with torch.no_grad(), torch.cuda.amp.autocast():
+            outputs = self.rinalmo(tokens)
+
+        out = self.out_embedding(outputs["representation"])
+        out = self.emb_act(out)
+        out = out + outputs["representation"]
+        out = out.reshape((-1, out.size(2)))
+        return out[nt_positions]
 
 class PAMNet(nn.Module):
     def __init__(self, config: Config, num_spherical=7, num_radial=6, envelope_exponent=5, time_dim=16):
@@ -50,23 +77,27 @@ class PAMNet(nn.Module):
         self.atom_dim = config.out_dim - 3 # 4 atom_types + 1 c4_prime flag + 4 residue types (AGCU) - 3 coordinates
         self.knns = config.knns
         self.non_mutable_edges:dict = None
+        self.seq_emb_dim = 1280
         
         assert self.dim % 2 == 0, "The dimension of the embeddings must be even."
 
+        self.total_dim = self.dim + self.atom_dim + self.seq_emb_dim + self.time_dim
         self.init_linear = MLP([3, self.dim])
         # self.atom_properties = nn.Linear(self.atom_dim, self.dim//2, bias=False)
         radial_bessels = 16
         # self.attn = nn.MultiheadAttention(self.dim + self.time_dim, num_heads=4)
+
+        self.sequence_module = SequenceModule(self.seq_emb_dim)
 
         self.rbf_g = BesselBasisLayer(radial_bessels, self.cutoff_g, envelope_exponent)
         self.rbf_l = BesselBasisLayer(radial_bessels, self.cutoff_l, envelope_exponent)
         self.sbf = SphericalBasisLayer(num_spherical, num_radial, self.cutoff_l, envelope_exponent)
 
         # Add 3 to rbf to process the edge attributes with type of the edge
-        self.mlp_rbf_g = MLP([radial_bessels + 3, self.dim+self.atom_dim+self.time_dim])
-        self.mlp_rbf_l = MLP([radial_bessels + 3, self.dim+self.atom_dim+self.time_dim])
-        self.mlp_sbf1 = MLP([num_spherical * num_radial, self.dim+self.atom_dim+self.time_dim])
-        self.mlp_sbf2 = MLP([num_spherical * num_radial, self.dim+self.atom_dim+self.time_dim])
+        self.mlp_rbf_g = MLP([radial_bessels + 3, self.total_dim])
+        self.mlp_rbf_l = MLP([radial_bessels + 3, self.total_dim])
+        self.mlp_sbf1 = MLP([num_spherical * num_radial, self.total_dim])
+        self.mlp_sbf2 = MLP([num_spherical * num_radial, self.total_dim])
 
         self.time_mlp = nn.Sequential(
             SinusoidalPositionEmbeddings(self.dim),
@@ -77,11 +108,11 @@ class PAMNet(nn.Module):
 
         self.global_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.global_layer.append(Global_MessagePassing(self.dim+self.atom_dim+self.time_dim, config.out_dim))
+            self.global_layer.append(Global_MessagePassing(self.total_dim, config.out_dim))
 
         self.local_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.local_layer.append(Local_MessagePassing(self.dim+self.atom_dim+self.time_dim, config.out_dim))
+            self.local_layer.append(Local_MessagePassing(self.total_dim, config.out_dim))
 
         self.out_linear = nn.Linear(2*config.out_dim+self.time_dim, config.out_dim)
         # self.out_linear = nn.Linear(config.out_dim+self.time_dim, config.out_dim)
@@ -181,13 +212,33 @@ class PAMNet(nn.Module):
                 x_jk, _ = self.attn(x_j, x_k, x_k)
                 out.append(x_jk)
         return torch.cat(out, dim=0)
+    
+    def merge_seq_embeddings(self, seq_emb, x):
+        seq_emb = seq_emb.repeat_interleave(5, dim=0) # the embeddings are only for N atoms
+        p = torch.argmax(x[:, :4], dim=1)
+        p_pos = torch.where(p==3)[0] # Find P atoms
+        # find places where difference between p_pos is different than 5
+        # i.e. P atom is missing
+        diff = p_pos[1:] - p_pos[:-1]
+        diff = torch.where(diff != 5)[0]
+        to_drop = p_pos[diff] + 5
+        if len(seq_emb) - len(x) != len(to_drop):
+            to_drop = torch.cat((torch.tensor([0], device=x.device), to_drop))
+        assert len(seq_emb) - len(x) == len(to_drop), f"len(x)={len(x)}, len(seq_emb)={len(seq_emb)}, len(to_drop)={len(to_drop)}, {to_drop}"
+        valid_positions = torch.zeros(seq_emb.size(0), device=x.device)
+        valid_positions[to_drop] = 1
+        valid_positions = torch.where(valid_positions==0)[0]
+        seq_emb = seq_emb[valid_positions]
+        return torch.cat((x, seq_emb), dim=1)
 
-    def forward(self, data, t=None):
+    def forward(self, data, seqs, t=None):
         x_raw = data.x.contiguous()
         batch = data.batch # This parameter assigns an index to each node in the graph, indicating which graph it belongs to.
 
         x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
         x = x_raw[:, 3:]  # one-hot encoded atom types
+        seq_emb = self.sequence_module(seqs, x.device)
+        x = self.merge_seq_embeddings(seq_emb, x)
         time_emb = self.time_mlp(t)
         pos = x_raw[:,:3].contiguous()
         x_pos = self.init_linear(pos) # coordinates embeddings
