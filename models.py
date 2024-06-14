@@ -60,7 +60,7 @@ class SequenceModule(nn.Module):
 
         out = self.out_embedding(outputs["representation"])
         out = self.emb_act(out)
-        out = out + outputs["representation"]
+        # out = out + outputs["representation"]
         out = out.reshape((-1, out.size(2)))
         return out[nt_positions]
 
@@ -77,7 +77,7 @@ class PAMNet(nn.Module):
         self.atom_dim = config.out_dim - 3 # 4 atom_types + 1 c4_prime flag + 4 residue types (AGCU) - 3 coordinates
         self.knns = config.knns
         self.non_mutable_edges:dict = None
-        self.seq_emb_dim = 1280
+        self.seq_emb_dim = config.dim
         
         assert self.dim % 2 == 0, "The dimension of the embeddings must be even."
 
