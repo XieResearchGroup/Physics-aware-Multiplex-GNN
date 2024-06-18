@@ -131,7 +131,7 @@ class PAMNet(nn.Module):
 
         # self.out_linear = nn.Linear(2*config.out_dim+self.time_dim, config.out_dim)
         self.struct_emb = nn.Linear(2*self.total_dim, config.dim)
-        self.out_linear = nn.Linear(self.seq_emb_dim + self.dim, config.out_dim)
+        self.out_linear = nn.Linear(self.seq_emb_dim + self.dim + self.total_dim, config.out_dim)
 
         self.softmax = nn.Softmax(dim=-1)
 
@@ -334,8 +334,9 @@ class PAMNet(nn.Module):
         out = out.sum(dim=0)
         out = self.struct_emb(out)
         out = self.seq_struct_module(seq_emb, out, batch)
+        out = torch.cat((x, out), dim=1)
         out = self.out_linear(out)
-        out = F.relu(out)
+        # out = F.relu(out)
         
         return out
     
