@@ -64,6 +64,20 @@ class SequenceModule(nn.Module):
         out = out.reshape((-1, out.size(2)))
         return out[nt_positions]
 
+class SequenceStructureModule(nn.Module):
+    def __init__(self, dim, n_layers:int=6, nhead:int=8):
+        super(SequenceStructureModule, self).__init__()
+        self.encoder_layer = nn.TransformerEncoderLayer(d_model=dim, nhead=nhead, batch_first=True)
+        self.transformer_encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=n_layers, norm=nn.LayerNorm(dim))
+
+    def forward(self, seq_emb, x_struct, batch):
+        x = torch.cat((seq_emb, x_struct), dim=1)
+        attn_mask = torch.zeros(x.size(0), x.size(0), device=x.device)
+        attn_pos = torch.where(batch[:, None] == batch[None, :])
+        attn_mask[attn_pos] = 1
+        out = self.transformer_encoder(x, mask=attn_mask.bool())
+        return out
+
 class PAMNet(nn.Module):
     def __init__(self, config: Config, num_spherical=7, num_radial=6, envelope_exponent=5, time_dim=16):
         super(PAMNet, self).__init__()
@@ -88,6 +102,7 @@ class PAMNet(nn.Module):
         # self.attn = nn.MultiheadAttention(self.dim + self.time_dim, num_heads=4)
 
         self.sequence_module = SequenceModule(self.seq_emb_dim)
+        self.seq_struct_module = SequenceStructureModule(self.seq_emb_dim + self.dim, n_layers=6, nhead=8)
 
         self.rbf_g = BesselBasisLayer(radial_bessels, self.cutoff_g, envelope_exponent)
         self.rbf_l = BesselBasisLayer(radial_bessels, self.cutoff_l, envelope_exponent)
@@ -108,14 +123,15 @@ class PAMNet(nn.Module):
 
         self.global_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.global_layer.append(Global_MessagePassing(self.total_dim, config.out_dim))
+            self.global_layer.append(Global_MessagePassing(self.total_dim, self.total_dim))
 
         self.local_layer = torch.nn.ModuleList()
         for _ in range(config.n_layer):
-            self.local_layer.append(Local_MessagePassing(self.total_dim, config.out_dim))
+            self.local_layer.append(Local_MessagePassing(self.total_dim, self.total_dim))
 
-        self.out_linear = nn.Linear(2*config.out_dim+self.time_dim, config.out_dim)
-        # self.out_linear = nn.Linear(config.out_dim+self.time_dim, config.out_dim)
+        # self.out_linear = nn.Linear(2*config.out_dim+self.time_dim, config.out_dim)
+        self.struct_emb = nn.Linear(2*self.total_dim, config.dim)
+        self.out_linear = nn.Linear(self.seq_emb_dim + self.dim, config.out_dim)
 
         self.softmax = nn.Softmax(dim=-1)
 
@@ -201,17 +217,6 @@ class PAMNet(nn.Module):
         # edge_indeces, edge_attr = self.get_non_redundant_edges(edge_indeces, edge_attr, device=data.edge_attr.device)
         return edge_indeces, edge_attr
 
-    def sequence_local_attention(self, x, batch, atoms_chunks1:int = 32, atoms_chunks2:int = 32):
-        out = []
-        for i in range(batch.max().item()+1): # iterate over batches to prevent computing attention between atoms in different graphs
-            atoms = x[batch==i]
-            # iterate over diagonal blocks of the matrix and compute attention between atoms in the same graph
-            for j in range(0, atoms.size(0), atoms_chunks1):
-                x_j = atoms[j:j+atoms_chunks1]
-                x_k = atoms[j:j+atoms_chunks2]
-                x_jk, _ = self.attn(x_j, x_k, x_k)
-                out.append(x_jk)
-        return torch.cat(out, dim=0)
     
     def merge_seq_embeddings(self, seq_emb, x):
         seq_emb = seq_emb.repeat_interleave(5, dim=0) # the embeddings are only for N atoms
@@ -229,7 +234,7 @@ class PAMNet(nn.Module):
         valid_positions[to_drop] = 1
         valid_positions = torch.where(valid_positions==0)[0]
         seq_emb = seq_emb[valid_positions]
-        return torch.cat((x, seq_emb), dim=1)
+        return torch.cat((x, seq_emb), dim=1), seq_emb
 
     def forward(self, data, seqs, t=None):
         x_raw = data.x.contiguous()
@@ -238,13 +243,12 @@ class PAMNet(nn.Module):
         x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
         x = x_raw[:, 3:]  # one-hot encoded atom types
         seq_emb = self.sequence_module(seqs, x.device)
-        x = self.merge_seq_embeddings(seq_emb, x)
+        seq_x, seq_emb = self.merge_seq_embeddings(seq_emb, x)
         time_emb = self.time_mlp(t)
         pos = x_raw[:,:3].contiguous()
         x_pos = self.init_linear(pos) # coordinates embeddings
         # x_prop = self.atom_properties(x) # atom properties embeddings
-        x = torch.cat([x_pos, x, time_emb], dim=1)
-        # x = x + self.sequence_local_attention(x, batch)
+        x = torch.cat([x_pos, seq_x, time_emb], dim=1)
 
         row, col = knn(pos, pos, self.knns, batch, batch)
         edge_index_knn = torch.stack([row, col], dim=0)
@@ -328,9 +332,11 @@ class PAMNet(nn.Module):
         # out = torch.cat(out_local, 0)
         out = (out * att_weight)
         out = out.sum(dim=0)
-        out = torch.cat((out, time_emb), dim=1)
+        out = self.struct_emb(out)
+        out = self.seq_struct_module(seq_emb, out, batch)
         out = self.out_linear(out)
-
+        out = F.relu(out)
+        
         return out
     
     def fine_tuning(self):
@@ -338,7 +344,7 @@ class PAMNet(nn.Module):
         for param in self.parameters():
             param.requires_grad = False
         # unfreeze the last layer
-        for param in self.out_linear.parameters():
+        for param in self.struct_emb.parameters():
             param.requires_grad = True
         # initialize last layer from scratch
         # self.out_linear.reset_parameters()
