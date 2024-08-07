@@ -39,7 +39,7 @@ def main():
     print('Seed:', args.seed)
     set_seed(args.seed)
     # Load the model
-    exp_name = "elated-gorge-310"
+    exp_name = "glowing-terrain-25"
     epoch = 800
     model_path = f"save/{exp_name}/model_{epoch}.h5"
     config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g, mode=args.mode, knns=args.knns)
@@ -50,12 +50,13 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Device: ", device)
     model.to(device)
-    ds = RNAPDBDataset("data/user_inputs/", name='test-pkl', mode='coarse-grain')
-    # ds = RNAPDBDataset("data/RNA-bgsu-hl-cn/", name='test-pkl', mode='coarse-grain')
+    # ds = RNAPDBDataset("data/user_inputs/", name='test-pkl', mode='coarse-grain')
+    ds = RNAPDBDataset("data/RNA-bgsu-j3/", name='test-pkl', mode='coarse-grain')
+    # ds = RNAPDBDataset("data/RNA-PDB-clean/", name='test-pkl', mode='coarse-grain')
     ds_loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False, pin_memory=True)
     sampler = Sampler(timesteps=args.timesteps)
     print("Sampling...")
-    sample(model, ds_loader, device, sampler, epoch, num_batches=None, exp_name=f"{exp_name}-user")
+    sample(model, ds_loader, device, sampler, epoch, num_batches=None, exp_name=f"{exp_name}-j3")
 
 if __name__ == "__main__":
     main()

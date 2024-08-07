@@ -8,6 +8,7 @@ import pandas as pd
 # ignore Bio python warnings
 import warnings
 from Bio import BiopythonWarning
+from pymol import cmd
 warnings.simplefilter('ignore', BiopythonWarning)
 
 from rnapolis.annotator import extract_secondary_structure
@@ -61,7 +62,7 @@ def get_inf(s_pred, s_gt):
     inf = math.sqrt(ppv * sty)
     return inf
 
-def superimpose_pdbs(trafl_path, targets_path, out_postfix='-000001_AA.pdb'):
+def superimpose_pdbs(trafl_path, targets_path, out_postfix='-000001_AA.pdb', method:str='pymol'):
     pdbs = os.listdir(trafl_path)
     pdbs = [pdb for pdb in pdbs if pdb.endswith(out_postfix)]
     outs = []
@@ -69,35 +70,52 @@ def superimpose_pdbs(trafl_path, targets_path, out_postfix='-000001_AA.pdb'):
         base_name = pdb.replace(out_postfix, '')
         pdb_name = base_name + '.pdb'
         if os.path.exists(f"{targets_path}/{pdb_name}"):
-            parser = PDBParser()
             ref_2d_structure = extract_2d_structure(f"{targets_path}/{pdb_name}")
-            ref_structure = parser.get_structure('ref', f"{targets_path}/{pdb_name}")
-            ref_model = ref_structure[0]
-            ref_atoms = [atom for atom in ref_model.get_atoms()]
-            ref_coords = [atom.get_coord() for atom in ref_atoms]
-
             pred_2d_structure = extract_2d_structure(f"{trafl_path}/{pdb}")
-            pred_structure = parser.get_structure('structure', f"{trafl_path}/{pdb}")
-            model = pred_structure[0]
-            atoms = [atom for atom in model.get_atoms()]
-            coords = [atom.get_coord() for atom in atoms]
-
-            sup = Superimposer()
+            
             try:
                 inf = get_inf(pred_2d_structure, ref_2d_structure)
-                sup.set_atoms(ref_atoms, atoms) # if there is a missing P atom in some chain, then is should be removed from prediction to do superposition
-                sup.apply(model.get_atoms())
-                outs.append((pdb, round(sup.rms, 3), round(inf, 3)))
-            except ValueError as e:
-                print(f"Skipping {pdb}. The INF calculation failed")
-                print(e)
-                continue
             except:
-                print(f"Skipping {pdb} as the superimposition failed")
+                print(f"Skipping {pdb} as the INF calculation failed")
                 continue
+            if method == 'pymol':
+                rms = align_pymol(trafl_path, targets_path, pdb, pdb_name)
+            elif method == 'biopython':
+                rms = align_biopython(trafl_path, targets_path, pdb, pdb_name)
+            outs.append((pdb, rms, round(inf, 3)))
+            
         else:
             print(f"Skipping {pdb} as the target pdb file: {targets_path}/{pdb_name} does not exist")
     return outs
+
+def align_biopython(trafl_path, targets_path, pdb, pdb_name):
+    parser = PDBParser()
+    ref_structure = parser.get_structure('ref', f"{targets_path}/{pdb_name}")
+    ref_model = ref_structure[0]
+    ref_atoms = [atom for atom in ref_model.get_atoms()]
+    
+    pred_structure = parser.get_structure('structure', f"{trafl_path}/{pdb}")
+    model = pred_structure[0]
+    atoms = [atom for atom in model.get_atoms()]
+    sup = Superimposer()
+    try:
+        sup.set_atoms(ref_atoms, atoms) # if there is a missing P atom in some chain, then is should be removed from prediction to do superposition
+        sup.apply(model.get_atoms())
+        
+    except:
+        print(f"Skipping {pdb} as the superimposition failed")
+        
+    return round(sup.rms, 3)
+    
+def align_pymol(trafl_path, targets_path, pdb, pdb_name):
+    cmd.reinitialize()
+    cmd.load(f"{targets_path}/{pdb_name}", "ref")
+    cmd.load(f"{trafl_path}/{pdb}", "structure")
+    rms = cmd.align("ref", "structure")[0]
+    cmd.delete("ref")
+    cmd.delete("structure")
+    return round(rms, 3)
+
 
 
 def main():
