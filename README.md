@@ -21,6 +21,7 @@ If you have any questions, feel free to open an issue or reach out to: szhang4@g
 </p>
 
 ## Updates
+- **`2024-10` We provide the saved checkpoint of PAMNet (`./save/pamnet_rna.pt`) and code (`inference_rna_puzzles.py`) that can be used for RNA 3D structure prediction or reproducing the related results in our paper.**
 - **`2024-01` We provide the docker image for running PAMNet at https://hub.docker.com/r/zetayue/pamnet.**
 - **`2023-10` PAMNet [paper](https://www.nature.com/articles/s41598-023-46382-8) was accepted by *Nature Scientific Reports*.**
 - **`2023-07` We release the code for PAMNet.**
@@ -59,15 +60,15 @@ nvidia-docker run --name pamnet -it --network=host --shm-size=1g --rm -v LOCAL_P
 
 **PDBbind for protein-ligand binding affinity prediction:**
 
- 1. Download `PDBbind_dataset.tar.gz` from [dropbox](https://www.dropbox.com/sh/2uih3c6fq37qfli/AAD-LHXSWMLAuGWzcQLk5WI3a)
- 2. Unzip the downloaded file under `./data/PDBbind`. There will be two subfolders (`core-set` and `refined-set`) after the unzip
- 3. Run `python preprocess_pdbbind.py` to preprocess the dataset to construct graphs
+ 1. Download `PDBbind_dataset.tar.gz` from [dropbox](https://www.dropbox.com/sh/2uih3c6fq37qfli/AAD-LHXSWMLAuGWzcQLk5WI3a).
+ 2. Unzip the downloaded file under `./data/PDBbind`. There will be two subfolders (`core-set` and `refined-set`) after the unzip.
+ 3. Run `python preprocess_pdbbind.py` to preprocess the dataset to construct graphs.
 
 **RNA-Puzzles for RNA 3D structure prediction:**
 
- 1. Download `classics_train_val.tar` from [Stanford Digital Repository](https://doi.org/10.25740/bn398fc4306)
- 2. Unzip the downloaded file under `./data/RNA-Puzzles`. There will be one subfolder `classics_train_val` containing `example_train` and `example_val`after the unzip
- 3. Run `python preprocess_rna_puzzles.py` to preprocess the dataset to construct graphs
+ 1. Download `classics_train_val.tar` from [Stanford Digital Repository](https://doi.org/10.25740/bn398fc4306).
+ 2. Unzip the downloaded file under `./data/RNA-Puzzles`. There will be one subfolder `classics_train_val` containing `example_train` and `example_val`after the unzip.
+ 3. Run `python preprocess_rna_puzzles.py` to preprocess the dataset to construct graphs.
 
 ## How to Run
 ### Arguments
@@ -86,7 +87,7 @@ nvidia-docker run --name pamnet -it --network=host --shm-size=1g --rm -v LOCAL_P
   --model           model to be used on QM9
   --target          index of target (0~11) for prediction on QM9
 ```
-### Example command for training and evaluation
+### Example commands
 **Small molecule property prediction on QM9:**
 
     python -u main_qm9.py --dataset 'QM9' --model 'PAMNet' --target=7 --epochs=900 --batch_size=32 --dim=128 --n_layer=6 --lr=1e-4
@@ -97,8 +98,14 @@ nvidia-docker run --name pamnet -it --network=host --shm-size=1g --rm -v LOCAL_P
 
 **RNA 3D structure prediction on RNA-Puzzles:**
 
-    python -u main_rna_puzzles.py --dataset 'RNA-Puzzles' --epochs=15 --batch_size=8  --dim=16 --n_layer=1 --lr=1e-4
+*Training and Validation on the datasets curated by [ARES](https://doi.org/10.1126/science.abe5650):*
 
+    python -u main_rna_puzzles.py --dataset 'RNA-Puzzles' --epochs=15 --batch_size=8  --dim=16 --n_layer=1 --lr=1e-4
+    
+*Inference on RNA-Puzzles (example below is to predict scores for the 21 native RNA structures in RNA-Puzzles between 2010 and 2017 using the saved checkpoint (`pamnet_rna.pt`) that can reproduce the results in our paper):*
+
+    python -u inference_rna_puzzles.py --batch_size=16 --dataset='rna_native' --saved_model='pamnet_rna.pt'
+ 
 ## Citation
 If you find our model and code helpful in your work, please consider citing us:
 ```

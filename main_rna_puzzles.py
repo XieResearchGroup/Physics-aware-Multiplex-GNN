@@ -54,6 +54,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=8, help='batch_size')
     parser.add_argument('--cutoff_l', type=float, default=2.6, help='cutoff in local layer')
     parser.add_argument('--cutoff_g', type=float, default=20.0, help='cutoff in global layer')
+    parser.add_argument('--flow', type=str, default='target_to_source', help='Flow direction of message passing')
     args = parser.parse_args()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -72,7 +73,8 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
     print("Data loaded!")
 
-    config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, cutoff_g=args.cutoff_g)
+    config = Config(dataset=args.dataset, dim=args.dim, n_layer=args.n_layer, cutoff_l=args.cutoff_l, 
+                    cutoff_g=args.cutoff_g, flow=args.flow)
 
     model = PAMNet(config).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd, amsgrad=False)
@@ -96,13 +98,13 @@ def main():
 
         print('Epoch: {:03d}, Train Loss: {:.7f}, Val Loss: {:.7f}'.format(epoch+1, train_loss, val_loss))
         
-        save_folder = os.path.join(".", "save", args.dataset)
+        save_folder = os.path.join(".", "save")
         if not os.path.exists(save_folder):
             os.makedirs(save_folder)
 
         if best_val_loss is None or val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save(model.state_dict(), os.path.join(save_folder, "best_model.h5"))
+            torch.save(model.state_dict(), os.path.join(save_folder, "pamnet_rna_best.pt"))
 
 
 if __name__ == "__main__":

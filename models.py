@@ -10,12 +10,13 @@ from layers import Global_MessagePassing, Local_MessagePassing, Local_MessagePas
     BesselBasisLayer, SphericalBasisLayer, MLP
 
 class Config(object):
-    def __init__(self, dataset, dim, n_layer, cutoff_l, cutoff_g):
+    def __init__(self, dataset, dim, n_layer, cutoff_l, cutoff_g, flow='source_to_target'):
         self.dataset = dataset
         self.dim = dim
         self.n_layer = n_layer
         self.cutoff_l = cutoff_l
         self.cutoff_g = cutoff_g
+        self.flow = flow
 
 class PAMNet(nn.Module):
     def __init__(self, config: Config, num_spherical=7, num_radial=6, envelope_exponent=5):
@@ -27,8 +28,11 @@ class PAMNet(nn.Module):
         self.cutoff_l = config.cutoff_l
         self.cutoff_g = config.cutoff_g
 
-        self.embeddings = nn.Parameter(torch.ones((5, self.dim)))
-        self.init_linear = nn.Linear(18, self.dim, bias=False)
+        if self.dataset[:3].lower() == "rna":
+            self.embeddings = nn.Parameter(torch.ones((3, self.dim))) # only C, N, O atoms for RNA
+        else:
+            self.embeddings = nn.Parameter(torch.ones((5, self.dim)))
+            self.init_linear = nn.Linear(18, self.dim, bias=False)
 
         self.rbf_g = BesselBasisLayer(16, self.cutoff_g, envelope_exponent)
         self.rbf_l = BesselBasisLayer(16, self.cutoff_l, envelope_exponent)
@@ -131,7 +135,7 @@ class PAMNet(nn.Module):
             edge_index_l = edge_index_g[:, mask_l]
             edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
 
-        elif self.dataset == "RNA-Puzzles":
+        elif self.dataset[:3].lower() == "rna":
             x_raw = x_raw.unsqueeze(-1) if x_raw.dim() == 1 else x_raw
             x = torch.index_select(self.embeddings, 0, x_raw[:, -1].long())
             pos = x_raw[:,:3].contiguous()
@@ -153,7 +157,7 @@ class PAMNet(nn.Module):
             edge_index_l, dist_l = self.get_edge_info(edge_index_l, pos)
 
         else:
-            raise ValueError("Invalid dataset.")
+            raise ValueError("Invalid dataset. If you are using any dataset related to RNA 3D structure prediction, be sure to use 'rna' as the first 3 characters of the dataset name.")
         
         idx_i, idx_j, idx_k, idx_kj, idx_ji, idx_i_pair, idx_j1_pair, idx_j2_pair, idx_jj_pair, idx_ji_pair = self.indices(edge_index_l, num_nodes=x.size(0))
         
@@ -213,7 +217,7 @@ class PAMNet(nn.Module):
         elif self.dataset == "PDBbind":
             out = out * all_index.unsqueeze(-1)
             out = global_add_pool(out, batch)
-        elif self.dataset == "RNA-Puzzles":
+        elif self.dataset[:3].lower() == "rna":
             out = global_mean_pool(out, batch)
         else:
             raise ValueError("Invalid dataset.")

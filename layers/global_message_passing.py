@@ -8,7 +8,7 @@ from layers import MLP, Res
 
 class Global_MessagePassing(MessagePassing):
     def __init__(self, config):
-        super(Global_MessagePassing, self).__init__()
+        super(Global_MessagePassing, self).__init__(flow=config.flow)
         self.dim = config.dim
 
         self.mlp_x1 = MLP([self.dim, self.dim])
