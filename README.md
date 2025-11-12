@@ -1,14 +1,16 @@
 
 # PAMNet: A Universal Framework for Accurate and Efficient Geometric Deep Learning of Molecular Systems
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-universal-framework-for-accurate-and-1/drug-discovery-on-qm9)](https://paperswithcode.com/sota/drug-discovery-on-qm9?p=a-universal-framework-for-accurate-and-1)
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/a-universal-framework-for-accurate-and-1/protein-ligand-affinity-prediction-on-pdbbind)](https://paperswithcode.com/sota/protein-ligand-affinity-prediction-on-pdbbind?p=a-universal-framework-for-accurate-and-1)
+[![PWC](https://img.shields.io/badge/State_of_the_Art-Drug_Discovery_on_QM9-22c1c3?logo=paperswithcode)](https://opencodepapers-b7572d.gitlab.io/benchmarks/drug-discovery-on-qm9.html)
 
-Official implementation of **PAMNet** (Physics-aware Multiplex Graph Neural Network) in our paper **[A universal framework for accurate and efficient geometric deep learning of molecular systems](https://www.nature.com/articles/s41598-023-46382-8)** accepted by *Nature Scientific Reports*.
+Official implementation of **PAMNet (Physics-aware Multiplex Graph Neural Network)**, as presented in our paper **[A universal framework for accurate and efficient geometric deep learning of molecular systems](https://www.nature.com/articles/s41598-023-46382-8)** accepted by *Nature Scientific Reports*.
 
-PAMNet is an improved version of our [MXMNet](https://github.com/zetayue/MXMNet) and outperforms state-of-the-art baselines regarding both accuracy and efficiency in diverse tasks including **small molecule property prediction**, **RNA 3D structure prediction**, and **protein-ligand binding affinity prediction**.
+PAMNet builds upon our previous [MXMNet](https://github.com/zetayue/MXMNet) model, achieving higher accuracy and efficiency than state-of-the-art baselines in diverse tasks such as: 
+- **Small molecule property prediction**
+- **RNA 3D structure prediction**
+- **Protein-ligand binding affinity prediction**
 <br/><br/>
 
-This implementation is also applicable to:
+This implementation is also applicable to our following works:
 1. [Efficient and Accurate Physics-aware Multiplex Graph Neural Networks for 3D Small Molecules and Macromolecule Complexes](https://arxiv.org/abs/2206.02789) (preprint).
 2. [Physics-aware Graph Neural Network for Accurate RNA 3D Structure Prediction](https://arxiv.org/abs/2210.16392) ([Machine Learning for Structural Biology Workshop](https://www.mlsb.io/) at *NeurIPS 2022*).
 
